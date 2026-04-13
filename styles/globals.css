@@ -1,3 +1,19 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { font-family: 'Nunito Sans', sans-serif; }
+
+:root {
+  --bg: #fdf9f6;
+  --bg2: #faf3ed;
+  --text: #3a2f2b;
+  --accent: #c9748a;
+  --accent-light: #f0c8d2;
+  --accent-dark: #a55570;
+  --card: #fff;
+  --border: #ede4dc;
+  --muted: #9e8e85;
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans: 'Nunito Sans', sans-serif;
+  --radius: 16px;
+  --radius-sm: 10px;
+}
