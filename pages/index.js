@@ -18,6 +18,10 @@ export default function Home({ initialProducts, settings }) {
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
   const leftForFree = FREE_DELIVERY - cartTotal
 
+  const heroImg = settings?.hero_image || products[0]?.images?.[0] || ''
+  const heroTitle = settings?.hero_title || 'Красота, которая ближе к телу'
+  const heroSubtitle = settings?.hero_subtitle || 'Будуарное нижнее бельё для особых моментов'
+
   function addToCart(product) {
     setCart(prev => {
       const ex = prev.find(x => x.id === product.id)
@@ -29,34 +33,41 @@ export default function Home({ initialProducts, settings }) {
 
   function removeFromCart(id) { setCart(prev => prev.filter(x => x.id !== id)) }
 
-  function openLightbox(product, idx = 0) {
-    setLightbox({ product, mediaIdx: idx })
+  function openLightbox(product) {
+    setLightbox({ product, mediaIdx: 0 })
     document.body.style.overflow = 'hidden'
   }
 
-  function closeLightbox() { setLightbox(null); document.body.style.overflow = '' }
-
-  function getMedia(product) {
-    const items = (product.images || []).map(url => ({ type: 'image', url }))
-    if (product.video_url) items.push({ type: 'video', url: product.video_url })
-    return items
+  function closeLightbox() {
+    setLightbox(null)
+    document.body.style.overflow = ''
   }
 
   function nextMedia() {
     if (!lightbox) return
-    const media = getMedia(lightbox.product)
-    setLightbox(l => ({ ...l, mediaIdx: (l.mediaIdx + 1) % media.length }))
+    const total = (lightbox.product.images?.length || 0) + (lightbox.product.video_url ? 1 : 0)
+    setLightbox(l => ({ ...l, mediaIdx: (l.mediaIdx + 1) % total }))
   }
 
   function prevMedia() {
     if (!lightbox) return
-    const media = getMedia(lightbox.product)
-    setLightbox(l => ({ ...l, mediaIdx: (l.mediaIdx - 1 + media.length) % media.length }))
+    const total = (lightbox.product.images?.length || 0) + (lightbox.product.video_url ? 1 : 0)
+    setLightbox(l => ({ ...l, mediaIdx: (l.mediaIdx - 1 + total) % total }))
   }
 
-  const heroImg = settings?.hero_image || products[0]?.images?.[0] || ''
-  const heroTitle = settings?.hero_title || 'Красота, которая ближе к телу'
-  const heroSubtitle = settings?.hero_subtitle || 'Будуарное нижнее бельё для особых моментов'
+  // Лайтбокс — текущий медиа элемент
+  const lbMedia = lightbox ? (() => {
+    const imgs = lightbox.product.images || []
+    const hasVideo = !!lightbox.product.video_url
+    const idx = lightbox.mediaIdx
+    if (idx < imgs.length) return { type: 'image', url: imgs[idx] }
+    if (hasVideo) return { type: 'video', url: lightbox.product.video_url }
+    return { type: 'image', url: imgs[0] }
+  })() : null
+
+  const lbTotal = lightbox
+    ? (lightbox.product.images?.length || 0) + (lightbox.product.video_url ? 1 : 0)
+    : 0
 
   return (
     <>
@@ -84,7 +95,9 @@ export default function Home({ initialProducts, settings }) {
           </a>
           <button className={styles.cartBtn} onClick={() => setCartOpen(true)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <path d="M16 10a4 4 0 01-8 0"/>
             </svg>
             {cartCount > 0 && <span className={styles.badge}>{cartCount}</span>}
           </button>
@@ -92,8 +105,11 @@ export default function Home({ initialProducts, settings }) {
         <nav className={styles.nav}>
           <div className={styles.navInner}>
             {categories.map(cat => (
-              <button key={cat} className={`${styles.navLink} ${activeCategory === cat ? styles.active : ''}`}
-                onClick={() => setActiveCategory(cat)}>{cat}</button>
+              <button key={cat}
+                className={`${styles.navLink} ${activeCategory === cat ? styles.active : ''}`}
+                onClick={() => setActiveCategory(cat)}>
+                {cat}
+              </button>
             ))}
           </div>
         </nav>
@@ -103,7 +119,10 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.mobileMenu}>
           <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
           {categories.map(cat => (
-            <button key={cat} className={styles.mobileLink} onClick={() => { setActiveCategory(cat); setMenuOpen(false) }}>{cat}</button>
+            <button key={cat} className={styles.mobileLink}
+              onClick={() => { setActiveCategory(cat); setMenuOpen(false) }}>
+              {cat}
+            </button>
           ))}
         </div>
       )}
@@ -112,7 +131,7 @@ export default function Home({ initialProducts, settings }) {
       <section className={styles.hero}>
         <div className={styles.heroText}>
           <div className={styles.heroTag}>Коллекция 2025</div>
-          <h1 dangerouslySetInnerHTML={{ __html: heroTitle.replace(/,/g, ',<br/>') }} />
+          <h1>{heroTitle}</h1>
           <p>{heroSubtitle}</p>
           <div className={styles.heroBtns}>
             <a href="#catalog" className={styles.btnFill}>Смотреть каталог</a>
@@ -132,14 +151,14 @@ export default function Home({ initialProducts, settings }) {
         <p>📦 По всей <strong>России</strong></p>
       </div>
 
+      {/* Каталог */}
       <main className={styles.section} id="catalog">
         <div className={styles.sHeader}>
           <h2>{activeCategory === 'Все' ? 'Все товары' : activeCategory}</h2>
-          <p>{filtered.length} {filtered.length===1?'товар':filtered.length<5?'товара':'товаров'}</p>
+          <p>{filtered.length} {filtered.length === 1 ? 'товар' : filtered.length < 5 ? 'товара' : 'товаров'}</p>
           <div className={styles.dot} />
         </div>
 
-        {/* Фильтр категорий */}
         <div className={styles.catFilter}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
@@ -157,12 +176,18 @@ export default function Home({ initialProducts, settings }) {
         ) : (
           <div className={styles.prodGrid}>
             {filtered.map(product => (
-              <ProductCard key={product.id} product={product} onAddToCart={addToCart} onOpen={openLightbox} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                onAddToCart={addToCart}
+                onOpen={openLightbox}
+              />
             ))}
           </div>
         )}
       </main>
 
+      {/* Доставка */}
       <section className={styles.section} style={{ paddingTop:0 }}>
         <div className={styles.sHeader}><h2>Доставка</h2><p>Отправляем по всей России</p><div className={styles.dot} /></div>
         <div className={styles.delCards}>
@@ -173,6 +198,7 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
       </section>
 
+      {/* Преимущества */}
       <section className={styles.trust}>
         <div className={styles.trustGrid}>
           <div className={styles.trustItem}><div className={styles.trustIcon}>🌹</div><h4>Будуарный стиль</h4><p>Изысканное бельё для женщин, которые ценят красоту</p></div>
@@ -182,6 +208,7 @@ export default function Home({ initialProducts, settings }) {
         </div>
       </section>
 
+      {/* Соцсети */}
       <section className={styles.socialStrip}>
         <h3>Мы в социальных сетях</h3>
         <p>Следите за новинками и акциями</p>
@@ -193,12 +220,17 @@ export default function Home({ initialProducts, settings }) {
         </div>
       </section>
 
+      {/* Подписка */}
       <section className={styles.nl}>
         <h2>Будьте в курсе</h2>
         <p>Подпишитесь и получите скидку на первый заказ</p>
-        <div className={styles.nlForm}><input type="email" placeholder="Ваш e-mail" /><button>Подписаться</button></div>
+        <div className={styles.nlForm}>
+          <input type="email" placeholder="Ваш e-mail" />
+          <button>Подписаться</button>
+        </div>
       </section>
 
+      {/* Футер */}
       <footer className={styles.footer}>
         <div className={styles.fGrid}>
           <div className={styles.fBrand}>
@@ -208,11 +240,22 @@ export default function Home({ initialProducts, settings }) {
           </div>
           <div>
             <h5>Каталог</h5>
-            <ul>{categories.filter(c=>c!=='Все').map(c=><li key={c}><a href="#" onClick={e=>{e.preventDefault();setActiveCategory(c);window.scrollTo(0,0)}}>{c}</a></li>)}</ul>
+            <ul>
+              {categories.filter(c => c !== 'Все').map(c => (
+                <li key={c}>
+                  <a href="#" onClick={e => { e.preventDefault(); setActiveCategory(c); window.scrollTo(0,0) }}>{c}</a>
+                </li>
+              ))}
+            </ul>
           </div>
           <div>
             <h5>Покупателям</h5>
-            <ul><li><a href="#">Доставка и оплата</a></li><li><a href="#">Обмен и возврат</a></li><li><a href="#">Размерная сетка</a></li><li><a href="#">FAQ</a></li></ul>
+            <ul>
+              <li><a href="#">Доставка и оплата</a></li>
+              <li><a href="#">Обмен и возврат</a></li>
+              <li><a href="#">Размерная сетка</a></li>
+              <li><a href="#">FAQ</a></li>
+            </ul>
           </div>
           <div>
             <h5>Контакты</h5>
@@ -234,84 +277,116 @@ export default function Home({ initialProducts, settings }) {
       {/* Корзина */}
       {cartOpen && <div className={styles.cartOverlay} onClick={() => setCartOpen(false)} />}
       <div className={`${styles.cartSidebar} ${cartOpen ? styles.open : ''}`}>
-        <div className={styles.cartHeader}><h3>Корзина</h3><button onClick={() => setCartOpen(false)}>✕</button></div>
+        <div className={styles.cartHeader}>
+          <h3>Корзина</h3>
+          <button onClick={() => setCartOpen(false)}>✕</button>
+        </div>
         <div className={styles.cartItems}>
           {cart.length === 0 ? (
             <div className={styles.cartEmpty}><div>🛍️</div><p>Корзина пуста</p></div>
-          ) : cart.map(item => (
-            <div key={item.id} className={styles.cartItem}>
-              {item.images?.[0] && <img src={item.images[0]} alt={item.name} />}
-              <div className={styles.cartItemInfo}>
-                <div className={styles.cartItemName}>{item.name}</div>
-                <div className={styles.cartItemCat}>{item.category} · {item.qty} шт</div>
-                <div className={styles.cartItemPrice}>{(item.price*item.qty).toLocaleString('ru')} ₽</div>
+          ) : (
+            cart.map(item => (
+              <div key={item.id} className={styles.cartItem}>
+                {item.images?.[0] && <img src={item.images[0]} alt={item.name} />}
+                <div className={styles.cartItemInfo}>
+                  <div className={styles.cartItemName}>{item.name}</div>
+                  <div className={styles.cartItemCat}>{item.category} · {item.qty} шт</div>
+                  <div className={styles.cartItemPrice}>{(item.price * item.qty).toLocaleString('ru')} ₽</div>
+                </div>
+                <button className={styles.cartRemove} onClick={() => removeFromCart(item.id)}>×</button>
               </div>
-              <button className={styles.cartRemove} onClick={() => removeFromCart(item.id)}>×</button>
-            </div>
-          ))}
+            ))
+          )}
         </div>
         <div className={styles.cartFooter}>
           <div className={styles.cartTotal}><span>Итого:</span><strong>{cartTotal.toLocaleString('ru')} ₽</strong></div>
           <div className={`${styles.delivNote} ${leftForFree <= 0 ? styles.free : ''}`}>
-            {leftForFree <= 0 ? '🎉 Бесплатная доставка включена!' : `Ещё ${leftForFree.toLocaleString('ru')} ₽ — доставка бесплатная`}
+            {leftForFree <= 0
+              ? '🎉 Бесплатная доставка включена!'
+              : `Ещё ${leftForFree.toLocaleString('ru')} ₽ — доставка бесплатная`}
           </div>
           <button className={styles.orderBtn}>Оформить заказ</button>
         </div>
       </div>
 
       {/* Лайтбокс */}
-      {lightbox && (() => {
-        const media = getMedia(lightbox.product)
-        const current = media[lightbox.mediaIdx] || media[0]
-        return (
-          <div className={styles.lbOverlay} onClick={closeLightbox}>
-            <div className={styles.lbBox} onClick={e => e.stopPropagation()}>
-              <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
-              <div className={styles.lbMain}>
-                {media.length > 1 && <button className={styles.lbPrev} onClick={prevMedia}>‹</button>}
-                {current?.type === 'video' ? (
-                  <video src={current.url} controls autoPlay muted loop className={styles.lbImg} style={{ objectFit:'contain', background:'#000' }} />
-                ) : (
-                  <img src={current?.url} alt={lightbox.product.name} className={styles.lbImg} />
+      {lightbox !== null && lbMedia !== null && (
+        <div className={styles.lbOverlay} onClick={closeLightbox}>
+          <div className={styles.lbBox} onClick={e => e.stopPropagation()}>
+            <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
+
+            {/* Медиа */}
+            <div className={styles.lbMain}>
+              {lbTotal > 1 && (
+                <button className={styles.lbPrev} onClick={e => { e.stopPropagation(); prevMedia() }}>‹</button>
+              )}
+              {lbMedia.type === 'video' ? (
+                <video
+                  src={lbMedia.url}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  className={styles.lbImg}
+                  style={{ objectFit:'contain', background:'#000' }}
+                />
+              ) : (
+                <img src={lbMedia.url} alt={lightbox.product.name} className={styles.lbImg} />
+              )}
+              {lbTotal > 1 && (
+                <button className={styles.lbNext} onClick={e => { e.stopPropagation(); nextMedia() }}>›</button>
+              )}
+            </div>
+
+            {/* Миниатюры */}
+            {lbTotal > 1 && (
+              <div className={styles.lbThumbs}>
+                {(lightbox.product.images || []).map((url, idx) => (
+                  <div key={idx}
+                    className={`${styles.lbThumb} ${idx === lightbox.mediaIdx ? styles.lbThumbActive : ''}`}
+                    onClick={e => { e.stopPropagation(); setLightbox(l => ({...l, mediaIdx: idx})) }}>
+                    <img src={url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top', borderRadius:6 }} />
+                  </div>
+                ))}
+                {lightbox.product.video_url && (
+                  <div
+                    className={`${styles.lbThumb} ${lightbox.mediaIdx === (lightbox.product.images?.length || 0) ? styles.lbThumbActive : ''}`}
+                    onClick={e => { e.stopPropagation(); setLightbox(l => ({...l, mediaIdx: lightbox.product.images?.length || 0})) }}>
+                    <div style={{ width:'100%', height:'100%', background:'#3a2f2b', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20, borderRadius:6 }}>▶</div>
+                  </div>
                 )}
-                {media.length > 1 && <button className={styles.lbNext} onClick={nextMedia}>›</button>}
               </div>
-              {media.length > 1 && (
-                <div className={styles.lbThumbs}>
-                  {media.map((m, idx) => (
-                    <div key={idx} onClick={() => setLightbox(l => ({...l, mediaIdx: idx}))}
-                      className={`${styles.lbThumb} ${idx === lightbox.mediaIdx ? styles.lbThumbActive : ''}`}>
-                      {m.type === 'video' ? (
-                        <div style={{ width:'100%', height:'100%', background:'#3a2f2b', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:20, borderRadius:6 }}>▶</div>
-                      ) : (
-                        <img src={m.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top', borderRadius:6 }} />
-                      )}
-                    </div>
+            )}
+
+            {/* Инфо */}
+            <div className={styles.lbInfo}>
+              <div className={styles.lbCat}>{lightbox.product.category}</div>
+              <div className={styles.lbName}>{lightbox.product.name}</div>
+              <div className={styles.lbPrices}>
+                <span className={styles.lbPrice}>{lightbox.product.price?.toLocaleString('ru')} ₽</span>
+                {lightbox.product.old_price && (
+                  <span className={styles.lbOld}>{lightbox.product.old_price.toLocaleString('ru')} ₽</span>
+                )}
+              </div>
+              {lightbox.product.description && (
+                <p className={styles.lbDesc}>{lightbox.product.description}</p>
+              )}
+              {lightbox.product.sizes?.length > 0 && (
+                <div className={styles.lbSizes}>
+                  <span style={{ fontSize:12, color:'#9e8e85', marginRight:8 }}>Размеры:</span>
+                  {lightbox.product.sizes.map(s => (
+                    <span key={s} className={styles.lbSize}>{s}</span>
                   ))}
                 </div>
               )}
-              <div className={styles.lbInfo}>
-                <div className={styles.lbCat}>{lightbox.product.category}</div>
-                <div className={styles.lbName}>{lightbox.product.name}</div>
-                <div className={styles.lbPrices}>
-                  <span className={styles.lbPrice}>{lightbox.product.price?.toLocaleString('ru')} ₽</span>
-                  {lightbox.product.old_price && <span className={styles.lbOld}>{lightbox.product.old_price.toLocaleString('ru')} ₽</span>}
-                </div>
-                {lightbox.product.description && <p className={styles.lbDesc}>{lightbox.product.description}</p>}
-                {lightbox.product.sizes?.length > 0 && (
-                  <div className={styles.lbSizes}>
-                    <span style={{ fontSize:12, color:'#9e8e85', marginRight:8 }}>Размеры:</span>
-                    {lightbox.product.sizes.map(s => <span key={s} className={styles.lbSize}>{s}</span>)}
-                  </div>
-                )}
-                <button className={styles.lbAddBtn} onClick={() => { addToCart(lightbox.product); closeLightbox() }}>
-                  + В корзину
-                </button>
-              </div>
+              <button className={styles.lbAddBtn}
+                onClick={() => { addToCart(lightbox.product); closeLightbox() }}>
+                + В корзину
+              </button>
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
     </>
   )
 }
@@ -322,12 +397,17 @@ function ProductCard({ product, onAddToCart, onOpen }) {
   const hasVideo = !!product.video_url
 
   return (
-    <div className={styles.prodCard} onClick={() => onOpen(product, 0)}>
-      <div className={styles.prodImg} onMouseEnter={() => imgs.length > 1 && setImgIdx(1)} onMouseLeave={() => setImgIdx(0)}>
+    <div className={styles.prodCard} onClick={() => onOpen(product)}>
+      <div className={styles.prodImg}
+        onMouseEnter={() => imgs.length > 1 && setImgIdx(1)}
+        onMouseLeave={() => setImgIdx(0)}>
         {imgs[imgIdx] && <img src={imgs[imgIdx]} alt={product.name} loading="lazy" />}
         {product.is_new && <span className={styles.tagNew}>New</span>}
         {hasVideo && <span className={styles.tagVideo}>▶ видео</span>}
-        <button className={styles.addBar} onClick={e => { e.stopPropagation(); onAddToCart(product) }}>+ В корзину</button>
+        <button className={styles.addBar}
+          onClick={e => { e.stopPropagation(); onAddToCart(product) }}>
+          + В корзину
+        </button>
       </div>
       <div className={styles.prodBody}>
         <div className={styles.prodCat}>{product.category}</div>
@@ -337,7 +417,9 @@ function ProductCard({ product, onAddToCart, onOpen }) {
           {product.old_price && <span className={styles.was}>{product.old_price.toLocaleString('ru')} ₽</span>}
         </div>
         {product.sizes?.length > 0 && (
-          <div className={styles.prodSizes}>{product.sizes.map(s => <span key={s}>{s}</span>)}</div>
+          <div className={styles.prodSizes}>
+            {product.sizes.map(s => <span key={s}>{s}</span>)}
+          </div>
         )}
       </div>
     </div>
@@ -350,7 +432,12 @@ export async function getServerSideProps() {
       supabase.from('products').select('*').eq('active', true).order('created_at', { ascending: false }),
       supabase.from('settings').select('*').eq('id', 1).single()
     ])
-    return { props: { initialProducts: productsRes.data || [], settings: settingsRes.data || null } }
+    return {
+      props: {
+        initialProducts: productsRes.data || [],
+        settings: settingsRes.data || null
+      }
+    }
   } catch {
     return { props: { initialProducts: [], settings: null } }
   }
