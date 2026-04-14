@@ -12,14 +12,20 @@ export default function Home({ initialProducts, settings }) {
   const [lightbox, setLightbox] = useState(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [sizeChartOpen, setSizeChartOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState(null)
   const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
   const [orderSent, setOrderSent] = useState(false)
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
   const categories = ['Все','Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки']
-  const filtered = activeCategory === 'Все' ? products : products.filter(p => p.category === activeCategory)
 
+  const searchResults = searchQuery.length > 1
+    ? products.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || p.category?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : []
+
+  const filtered = activeCategory === 'Все' ? products : products.filter(p => p.category === activeCategory)
   const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
   const deliveryCost = cartTotal >= FREE_DELIVERY ? 0 : 350
@@ -30,9 +36,24 @@ export default function Home({ initialProducts, settings }) {
   const heroTitle = settings?.hero_title || 'Красота, которая ближе к телу'
   const heroSubtitle = settings?.hero_subtitle || 'Будуарное нижнее бельё для особых моментов'
 
+  // Лайтбокс вычисления
+  const lbImgs = lightbox?.product.images || []
+  const lbHasVideo = !!lightbox?.product.video_url
+  const lbTotal = lbImgs.length + (lbHasVideo ? 1 : 0)
+  const lbIdx = lightbox?.mediaIdx || 0
+  const lbIsVideo = lbHasVideo && lbIdx >= lbImgs.length
+  const lbUrl = lbIsVideo ? lightbox?.product.video_url : (lbImgs[lbIdx] || lbImgs[0])
+
   function showToast(text) {
     setToast(text)
     setTimeout(() => setToast(null), 2500)
+  }
+
+  function selectCategory(cat) {
+    setActiveCategory(cat)
+    setTimeout(() => {
+      document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
   }
 
   function addToCart(product, size) {
@@ -52,8 +73,7 @@ export default function Home({ initialProducts, settings }) {
     setCart(prev => prev.map(x => {
       if (x.key !== key) return x
       const newQty = x.qty + delta
-      if (newQty < 1) return null
-      return {...x, qty: newQty}
+      return newQty < 1 ? null : {...x, qty: newQty}
     }).filter(Boolean))
   }
 
@@ -62,40 +82,28 @@ export default function Home({ initialProducts, settings }) {
     document.body.style.overflow = 'hidden'
   }
 
-  function closeLightbox() {
-    setLightbox(null)
-    document.body.style.overflow = ''
-  }
+  function closeLightbox() { setLightbox(null); document.body.style.overflow = '' }
 
   function nextMedia() {
     if (!lightbox) return
-    const total = (lightbox.product.images?.length || 0) + (lightbox.product.video_url ? 1 : 0)
-    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx + 1) % total}))
+    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx + 1) % lbTotal}))
   }
 
   function prevMedia() {
     if (!lightbox) return
-    const total = (lightbox.product.images?.length || 0) + (lightbox.product.video_url ? 1 : 0)
-    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx - 1 + total) % total}))
+    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx - 1 + lbTotal) % lbTotal}))
   }
-
-  const lbImgs = lightbox?.product.images || []
-  const lbHasVideo = !!lightbox?.product.video_url
-  const lbTotal = lbImgs.length + (lbHasVideo ? 1 : 0)
-  const lbIdx = lightbox?.mediaIdx || 0
-  const lbIsVideo = lbHasVideo && lbIdx >= lbImgs.length
-  const lbUrl = lbIsVideo ? lightbox.product.video_url : (lbImgs[lbIdx] || lbImgs[0])
 
   function sendWhatsApp() {
     const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} = ${(x.price * x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const msg = `Здравствуйте! Хочу заказать:\n${items}\n\nИтого: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : deliveryCost + ' ₽'}`
+    const msg = `Здравствуйте! Хочу заказать:\n${items}\n\nИтого: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}`
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   function submitOrder(e) {
     e.preventDefault()
     const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
+    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
     setOrderSent(true)
     setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
@@ -110,26 +118,53 @@ export default function Home({ initialProducts, settings }) {
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Nunito+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Toast уведомление */}
+      {/* Toast */}
       {toast && <div className={styles.toast}>{toast}</div>}
 
       <div className={styles.announce}>
         🎁 Бесплатная доставка при заказе от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> по всей России
       </div>
 
+      {/* ── ШАПКА ── */}
       <header className={styles.header}>
         <div className={styles.hTop}>
           <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/>
             </svg>
           </button>
+
           <a href="/" className={styles.logo}>
             <span className={styles.logoMain}>Bellissimo</span>
             <span className={styles.logoSub}>Lingerie</span>
           </a>
-          <div style={{display:'flex',gap:12,alignItems:'center'}}>
-            <button className={styles.cartBtn} onClick={() => setCartOpen(true)}>
+
+          {/* Иконки шапки */}
+          <div className={styles.hActions}>
+
+            {/* Поиск */}
+            <button className={styles.hBtn} onClick={() => setSearchOpen(s => !s)} title="Поиск">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
+                <circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4.5 4.5"/>
+              </svg>
+            </button>
+
+            {/* WhatsApp */}
+            <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.hBtn} title="Написать в WhatsApp">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                <path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/>
+              </svg>
+            </a>
+
+            {/* Размерная сетка */}
+            <button className={styles.hBtn} onClick={() => setSizeChartOpen(true)} title="Размерная сетка">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
+                <path d="M2 20h20M2 20V8l6-6h8l6 6v12M9 20v-6h6v6"/><path d="M9 8h.01M12 8h.01M15 8h.01"/>
+              </svg>
+            </button>
+
+            {/* Корзина */}
+            <button className={styles.cartBtn} onClick={() => setCartOpen(true)} title="Корзина">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
                 <line x1="3" y1="6" x2="21" y2="6"/>
@@ -139,22 +174,77 @@ export default function Home({ initialProducts, settings }) {
             </button>
           </div>
         </div>
+
+        {/* Поисковая строка */}
+        {searchOpen && (
+          <div className={styles.searchBar}>
+            <div className={styles.searchInner}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="18" height="18" style={{flexShrink:0,color:'var(--muted)'}}>
+                <circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4.5 4.5"/>
+              </svg>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Поиск по товарам..."
+                className={styles.searchInput}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:18}}>×</button>
+              )}
+              <button onClick={() => { setSearchOpen(false); setSearchQuery('') }} style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:13,whiteSpace:'nowrap'}}>Закрыть</button>
+            </div>
+            {searchQuery.length > 1 && (
+              <div className={styles.searchResults}>
+                {searchResults.length === 0 ? (
+                  <div style={{padding:'16px 20px',color:'var(--muted)',fontSize:14}}>Ничего не найдено</div>
+                ) : (
+                  searchResults.map(p => (
+                    <div key={p.id} className={styles.searchItem} onClick={() => { openLightbox(p); setSearchOpen(false); setSearchQuery('') }}>
+                      {p.images?.[0] && <img src={p.images[0]} alt={p.name} />}
+                      <div>
+                        <div style={{fontSize:14,fontFamily:'Georgia,serif',color:'var(--text)'}}>{p.name}</div>
+                        <div style={{fontSize:12,color:'var(--muted)'}}>{p.category} · {p.price?.toLocaleString('ru')} ₽</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <nav className={styles.nav}>
           <div className={styles.navInner}>
             {categories.map(cat => (
-              <button key={cat} className={`${styles.navLink} ${activeCategory===cat?styles.active:''}`}
-                onClick={() => setActiveCategory(cat)}>{cat}</button>
+              <button key={cat}
+                className={`${styles.navLink} ${activeCategory===cat?styles.active:''}`}
+                onClick={() => selectCategory(cat)}>
+                {cat}
+              </button>
             ))}
           </div>
         </nav>
       </header>
 
+      {/* Мобильное меню */}
       {menuOpen && (
         <div className={styles.mobileMenu}>
           <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
           {categories.map(cat => (
-            <button key={cat} className={styles.mobileLink} onClick={() => {setActiveCategory(cat);setMenuOpen(false)}}>{cat}</button>
+            <button key={cat} className={styles.mobileLink}
+              onClick={() => { selectCategory(cat); setMenuOpen(false) }}>{cat}</button>
           ))}
+          <div style={{marginTop:'auto',paddingTop:24,borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:10}}>
+            <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer"
+              style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'#f0faf3',borderRadius:10,textDecoration:'none',color:'#2d7a47',fontWeight:600,fontSize:14}}>
+              💬 WhatsApp
+            </a>
+            <button onClick={() => { setSizeChartOpen(true); setMenuOpen(false) }}
+              style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'var(--bg2)',borderRadius:10,border:'none',cursor:'pointer',fontSize:14,textAlign:'left'}}>
+              📏 Размерная сетка
+            </button>
+          </div>
         </div>
       )}
 
@@ -225,7 +315,7 @@ export default function Home({ initialProducts, settings }) {
           <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>от 350 ₽ · 1 день</div></div>
         </div>
         <div className={styles.delNote}>
-          💳 Оплата картой <strong>МИР</strong> после подтверждения заказа · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong>
+          💳 Оплата картой <strong>МИР</strong> после подтверждения · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong>
         </div>
       </section>
 
@@ -268,10 +358,7 @@ export default function Home({ initialProducts, settings }) {
       <section className={styles.nl}>
         <h2>Будьте в курсе</h2>
         <p>Подпишитесь и получите скидку 10% на первый заказ</p>
-        <div className={styles.nlForm}>
-          <input type="email" placeholder="Ваш e-mail" />
-          <button>Подписаться</button>
-        </div>
+        <div className={styles.nlForm}><input type="email" placeholder="Ваш e-mail" /><button>Подписаться</button></div>
       </section>
 
       {/* Футер */}
@@ -286,7 +373,7 @@ export default function Home({ initialProducts, settings }) {
             <h5>Каталог</h5>
             <ul>
               {categories.filter(c=>c!=='Все').map(c=>(
-                <li key={c}><a href="#" onClick={e=>{e.preventDefault();setActiveCategory(c);window.scrollTo(0,0)}}>{c}</a></li>
+                <li key={c}><a href="#" onClick={e=>{e.preventDefault();selectCategory(c)}}>{c}</a></li>
               ))}
             </ul>
           </div>
@@ -320,10 +407,9 @@ export default function Home({ initialProducts, settings }) {
       {cartOpen && <div className={styles.cartOverlay} onClick={() => setCartOpen(false)} />}
       <div className={`${styles.cartSidebar} ${cartOpen ? styles.open : ''}`}>
         <div className={styles.cartHeader}>
-          <h3>Корзина {cartCount > 0 && <span style={{fontSize:14,color:'var(--muted)',fontWeight:400}}>({cartCount} шт)</span>}</h3>
+          <h3>Корзина {cartCount > 0 && <span style={{fontSize:13,color:'var(--muted)',fontWeight:400}}>· {cartCount} шт</span>}</h3>
           <button onClick={() => setCartOpen(false)}>✕</button>
         </div>
-
         <div className={styles.cartItems}>
           {cart.length === 0 ? (
             <div className={styles.cartEmpty}>
@@ -342,13 +428,13 @@ export default function Home({ initialProducts, settings }) {
                     <div className={styles.cartItemName}>{item.name}</div>
                     <div className={styles.cartItemCat}>
                       {item.category}
-                      {item.selectedSize && <span style={{marginLeft:6,padding:'2px 6px',background:'var(--bg2)',borderRadius:4,fontSize:10}}>{item.selectedSize}</span>}
+                      {item.selectedSize && <span style={{marginLeft:6,padding:'2px 6px',background:'var(--bg2)',borderRadius:4,fontSize:10,fontWeight:600}}>{item.selectedSize}</span>}
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
                       <div style={{display:'flex',alignItems:'center',border:'1px solid var(--border)',borderRadius:6,overflow:'hidden'}}>
-                        <button onClick={() => changeQty(item.key, -1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                        <button onClick={() => changeQty(item.key,-1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>−</button>
                         <span style={{width:28,textAlign:'center',fontSize:13,fontWeight:600}}>{item.qty}</span>
-                        <button onClick={() => changeQty(item.key, +1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
+                        <button onClick={() => changeQty(item.key,+1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>+</button>
                       </div>
                       <div className={styles.cartItemPrice}>{(item.price * item.qty).toLocaleString('ru')} ₽</div>
                     </div>
@@ -357,9 +443,8 @@ export default function Home({ initialProducts, settings }) {
                 </div>
               ))}
 
-              {/* Прогресс до бесплатной доставки */}
-              {leftForFree > 0 && (
-                <div style={{padding:'12px',background:'var(--bg2)',borderRadius:10,margin:'8px 0'}}>
+              {leftForFree > 0 ? (
+                <div style={{padding:'12px 14px',background:'var(--bg2)',borderRadius:10,margin:'8px 0'}}>
                   <div style={{fontSize:12,color:'var(--muted)',marginBottom:6}}>
                     До бесплатной доставки ещё <strong style={{color:'var(--accent-dark)'}}>{leftForFree.toLocaleString('ru')} ₽</strong>
                   </div>
@@ -367,8 +452,7 @@ export default function Home({ initialProducts, settings }) {
                     <div style={{height:'100%',background:'var(--accent)',borderRadius:2,width:`${Math.min(100,(cartTotal/FREE_DELIVERY)*100)}%`,transition:'width .4s'}}/>
                   </div>
                 </div>
-              )}
-              {leftForFree <= 0 && (
+              ) : (
                 <div style={{padding:'10px 14px',background:'#edf7ed',borderRadius:10,fontSize:13,color:'#3a7a3a',fontWeight:600,margin:'8px 0'}}>
                   🎉 Бесплатная доставка включена!
                 </div>
@@ -379,22 +463,21 @@ export default function Home({ initialProducts, settings }) {
 
         {cart.length > 0 && (
           <div className={styles.cartFooter}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:14,color:'var(--muted)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:13,color:'var(--muted)'}}>
               <span>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span>
             </div>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12,fontSize:14,color:'var(--muted)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12,fontSize:13,color:'var(--muted)'}}>
               <span>Доставка:</span>
-              <span style={{color:deliveryCost===0?'#3a7a3a':'inherit',fontWeight:deliveryCost===0?600:'inherit'}}>
+              <span style={{color:deliveryCost===0?'#3a7a3a':'inherit',fontWeight:deliveryCost===0?700:'inherit'}}>
                 {deliveryCost === 0 ? '🎁 Бесплатно' : `~${deliveryCost} ₽`}
               </span>
             </div>
             <div className={styles.cartTotal}><span>Итого:</span><strong>{orderTotal.toLocaleString('ru')} ₽</strong></div>
-
             <button className={styles.orderBtn} onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>
               Оформить заказ →
             </button>
             <button onClick={sendWhatsApp}
-              style={{width:'100%',padding:'12px',background:'#25d366',color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontWeight:600,marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              style={{width:'100%',padding:'11px',background:'#25d366',color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontWeight:600,marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
               💬 Заказать через WhatsApp
             </button>
           </div>
@@ -403,45 +486,37 @@ export default function Home({ initialProducts, settings }) {
 
       {/* ── ОФОРМЛЕНИЕ ЗАКАЗА ── */}
       {checkoutOpen && (
-        <div className={styles.lbOverlay} onClick={() => setCheckoutOpen(false)}>
-          <div style={{background:'#fff',borderRadius:20,maxWidth:480,width:'100%',padding:32,position:'relative'}} onClick={e=>e.stopPropagation()}>
-            <button onClick={() => setCheckoutOpen(false)} className={styles.lbClose}>✕</button>
-
+        <div className={styles.modalOverlay} onClick={() => setCheckoutOpen(false)}>
+          <div className={styles.modalBox} onClick={e=>e.stopPropagation()}>
+            <button onClick={() => setCheckoutOpen(false)} className={styles.modalClose}>✕</button>
             {orderSent ? (
               <div style={{textAlign:'center',padding:'32px 0'}}>
                 <div style={{fontSize:64,marginBottom:16}}>✅</div>
-                <h3 style={{fontFamily:'Georgia,serif',fontSize:24,fontWeight:300,marginBottom:8,color:'var(--text)'}}>Заказ отправлен!</h3>
+                <h3 style={{fontFamily:'Georgia,serif',fontSize:24,fontWeight:300,marginBottom:8}}>Заказ отправлен!</h3>
                 <p style={{color:'var(--muted)',fontSize:14}}>Менеджер свяжется с вами в WhatsApp в течение 5 минут</p>
               </div>
             ) : (
               <>
-                <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4,color:'var(--text)'}}>Оформление заказа</h3>
-                <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму — мы свяжемся с вами через WhatsApp</p>
-
+                <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Оформление заказа</h3>
+                <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму — мы свяжемся через WhatsApp</p>
                 <form onSubmit={submitOrder} style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {[
-                    ['name','Ваше имя *','Анна','text'],
-                    ['phone','Телефон *','+7 (___) ___-__-__','tel'],
-                    ['address','Город и адрес доставки *','Москва, ул. Примерная, д. 1','text'],
-                  ].map(([field, label, placeholder, type]) => (
+                  {[['name','Ваше имя *','Анна','text'],['phone','Телефон *','+7 (___) ___-__-__','tel'],['address','Город и адрес доставки *','Москва, ул. Примерная, д. 1','text']].map(([field,label,ph,type]) => (
                     <div key={field}>
                       <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>{label}</label>
-                      <input type={type} required value={orderForm[field]} onChange={e=>setOrderForm(f=>({...f,[field]:e.target.value}))} placeholder={placeholder}
+                      <input type={type} required value={orderForm[field]} onChange={e=>setOrderForm(f=>({...f,[field]:e.target.value}))} placeholder={ph}
                         style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box'}} />
                     </div>
                   ))}
                   <div>
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Комментарий</label>
-                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(f=>({...f,comment:e.target.value}))} placeholder="Пожелания, уточнения..." rows={2}
+                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(f=>({...f,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
                       style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
                   </div>
-
                   <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:13}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span></div>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Доставка:</span><span style={{color:deliveryCost===0?'#3a7a3a':'inherit'}}>{deliveryCost===0?'Бесплатно':`~${deliveryCost} ₽`}</span></div>
                     <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15,borderTop:'1px solid var(--border)',paddingTop:8,marginTop:4}}><span>Итого:</span><span style={{color:'var(--accent-dark)'}}>{orderTotal.toLocaleString('ru')} ₽</span></div>
                   </div>
-
                   <button type="submit" style={{padding:'14px',background:'#25d366',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
                     💬 Подтвердить через WhatsApp
                   </button>
@@ -452,54 +527,46 @@ export default function Home({ initialProducts, settings }) {
         </div>
       )}
 
-      {/* ── РАЗМЕРНАЯ СЕТКА ── */}
+      {/* ── РАЗМЕРНАЯ СЕТКА (z-index выше лайтбокса) ── */}
       {sizeChartOpen && (
-        <div className={styles.lbOverlay} onClick={() => setSizeChartOpen(false)}>
-          <div style={{background:'#fff',borderRadius:20,maxWidth:600,width:'100%',padding:32,maxHeight:'90vh',overflowY:'auto',position:'relative'}} onClick={e=>e.stopPropagation()}>
-            <button onClick={() => setSizeChartOpen(false)} className={styles.lbClose}>✕</button>
+        <div className={styles.modalOverlay} style={{zIndex:600}} onClick={() => setSizeChartOpen(false)}>
+          <div className={styles.modalBox} style={{maxWidth:620}} onClick={e=>e.stopPropagation()}>
+            <button onClick={() => setSizeChartOpen(false)} className={styles.modalClose}>✕</button>
             <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Размерная сетка</h3>
-            <p style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>Все размеры указаны для российских стандартов</p>
+            <p style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>Все размеры для российских стандартов</p>
 
-            <h4 style={{fontSize:13,fontWeight:700,marginBottom:10,color:'var(--text)'}}>ОДЕЖДА (пижамы, халаты, сорочки)</h4>
+            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10,color:'var(--text)'}}>Одежда (пижамы, халаты, сорочки)</h4>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:24}}>
-              <thead>
-                <tr style={{background:'var(--bg2)'}}>
-                  {['Размер','Грудь (см)','Талия (см)','Бёдра (см)'].map(h=>(
-                    <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+              <thead><tr style={{background:'var(--bg2)'}}>
+                {['Размер','Грудь','Талия','Бёдра'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}
+              </tr></thead>
               <tbody>
-                {[['XS (42)','80–84','60–64','86–90'],['S (44)','84–88','64–68','90–94'],['M (46)','88–92','68–72','94–98'],['L (48)','92–96','72–76','98–102'],['XL (50)','96–100','76–80','102–106'],['XXL (52)','100–104','80–84','106–110']].map(([size,...vals],i)=>(
-                  <tr key={size} style={{background:i%2===0?'#fff':'var(--bg)'}}>
-                    <td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{size}</td>
-                    {vals.map((v,j)=><td key={j} style={{padding:'8px 12px',color:'var(--text)'}}>{v}</td>)}
+                {[['XS (42)','80–84','60–64','86–90'],['S (44)','84–88','64–68','90–94'],['M (46)','88–92','68–72','94–98'],['L (48)','92–96','72–76','98–102'],['XL (50)','96–100','76–80','102–106'],['XXL (52)','100–104','80–84','106–110']].map(([s,...v],i)=>(
+                  <tr key={s} style={{background:i%2===0?'#fff':'var(--bg)'}}>
+                    <td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{s}</td>
+                    {v.map((val,j)=><td key={j} style={{padding:'8px 12px'}}>{val} см</td>)}
                   </tr>
                 ))}
               </tbody>
             </table>
 
-            <h4 style={{fontSize:13,fontWeight:700,marginBottom:10,color:'var(--text)'}}>БЮСТГАЛЬТЕРЫ</h4>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:16}}>
-              <thead>
-                <tr style={{background:'var(--bg2)'}}>
-                  {['Размер','Объём груди (см)','Обхват под грудью (см)'].map(h=>(
-                    <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)'}}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
+            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10,color:'var(--text)'}}>Бюстгальтеры</h4>
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:20}}>
+              <thead><tr style={{background:'var(--bg2)'}}>
+                {['Размер','Объём груди','Под грудью'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}
+              </tr></thead>
               <tbody>
-                {[['75A','83–85','73–77'],['75B','85–87','73–77'],['80B','88–90','78–82'],['80C','90–92','78–82'],['85B','93–95','83–87'],['85C','95–97','83–87'],['90C','98–100','88–92'],['90D','100–102','88–92']].map(([size,...vals],i)=>(
-                  <tr key={size} style={{background:i%2===0?'#fff':'var(--bg)'}}>
-                    <td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{size}</td>
-                    {vals.map((v,j)=><td key={j} style={{padding:'8px 12px',color:'var(--text)'}}>{v}</td>)}
+                {[['75A','83–85','73–77'],['75B','85–87','73–77'],['80B','88–90','78–82'],['80C','90–92','78–82'],['85B','93–95','83–87'],['85C','95–97','83–87'],['90C','98–100','88–92'],['90D','100–102','88–92']].map(([s,...v],i)=>(
+                  <tr key={s} style={{background:i%2===0?'#fff':'var(--bg)'}}>
+                    <td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{s}</td>
+                    {v.map((val,j)=><td key={j} style={{padding:'8px 12px'}}>{val} см</td>)}
                   </tr>
                 ))}
               </tbody>
             </table>
 
             <div style={{padding:'12px',background:'#fff8f0',borderRadius:8,fontSize:12,color:'var(--muted)',lineHeight:1.6}}>
-              💡 <strong>Совет:</strong> Если вы не знаете свой размер — замерьте сантиметровой лентой обхват груди, талии и бёдер. Или напишите нам в WhatsApp — поможем подобрать!
+              💡 Не знаете размер? Напишите нам в WhatsApp — поможем подобрать!
             </div>
           </div>
         </div>
@@ -508,22 +575,19 @@ export default function Home({ initialProducts, settings }) {
       {/* ── ЛАЙТБОКС ── */}
       {lightbox !== null && (
         <div className={styles.lbOverlay} onClick={closeLightbox}>
-          <div className={styles.lbBox} onClick={e => e.stopPropagation()}>
+          <div className={styles.lbBox} onClick={e=>e.stopPropagation()}>
             <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
-
             <div className={styles.lbMain}>
               {lbTotal > 1 && <button className={styles.lbPrev} onClick={e=>{e.stopPropagation();prevMedia()}}>‹</button>}
-              {lbIsVideo ? (
-                <video src={lbUrl} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain',background:'#000'}} />
-              ) : (
-                <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />
-              )}
+              {lbIsVideo
+                ? <video src={lbUrl} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain',background:'#000'}} />
+                : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />
+              }
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
             </div>
-
             {lbTotal > 1 && (
               <div className={styles.lbThumbs}>
-                {lbImgs.map((url, idx) => (
+                {lbImgs.map((url,idx) => (
                   <div key={idx} className={`${styles.lbThumb} ${idx===lightbox.mediaIdx?styles.lbThumbActive:''}`}
                     onClick={e=>{e.stopPropagation();setLightbox(l=>({...l,mediaIdx:idx}))}}>
                     <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',borderRadius:6}} />
@@ -537,7 +601,6 @@ export default function Home({ initialProducts, settings }) {
                 )}
               </div>
             )}
-
             <div className={styles.lbInfo}>
               <div className={styles.lbCat}>{lightbox.product.category}</div>
               <div className={styles.lbName}>{lightbox.product.name}</div>
@@ -546,33 +609,29 @@ export default function Home({ initialProducts, settings }) {
                 {lightbox.product.old_price && <span className={styles.lbOld}>{lightbox.product.old_price.toLocaleString('ru')} ₽</span>}
               </div>
               {lightbox.product.description && <p className={styles.lbDesc}>{lightbox.product.description}</p>}
-
               {lightbox.product.sizes?.length > 0 && (
                 <div>
-                  <div style={{fontSize:12,color:'var(--muted)',marginBottom:8,fontWeight:600,letterSpacing:.5}}>
+                  <div style={{fontSize:11,color:'var(--muted)',marginBottom:8,fontWeight:700,letterSpacing:.5,display:'flex',alignItems:'center',gap:8}}>
                     РАЗМЕР:
-                    <button onClick={() => setSizeChartOpen(true)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:11,marginLeft:8,textDecoration:'underline'}}>
-                      размерная сетка
+                    <button onClick={() => setSizeChartOpen(true)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:11,textDecoration:'underline',padding:0}}>
+                      таблица размеров
                     </button>
                   </div>
                   <div className={styles.lbSizes}>
                     {lightbox.product.sizes.map(s => (
                       <span key={s} className={`${styles.lbSize} ${lightbox.selectedSize===s?styles.lbSizeActive:''}`}
-                        onClick={() => setLightbox(l => ({...l, selectedSize: s}))}>
+                        onClick={() => setLightbox(l=>({...l,selectedSize:s}))}>
                         {s}
                       </span>
                     ))}
                   </div>
                 </div>
               )}
-
-              <button className={styles.lbAddBtn}
-                onClick={() => { addToCart(lightbox.product, lightbox.selectedSize); closeLightbox() }}>
+              <button className={styles.lbAddBtn} onClick={() => { addToCart(lightbox.product, lightbox.selectedSize); closeLightbox() }}>
                 + В корзину {lightbox.selectedSize && `(${lightbox.selectedSize})`}
               </button>
-
               <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer"
-                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px',background:'#f0faf3',color:'#2d7a47',borderRadius:10,fontSize:13,textDecoration:'none',fontWeight:600,border:'1px solid #c6e9d0'}}>
+                style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'11px',background:'#f0faf3',color:'#2d7a47',borderRadius:10,fontSize:13,textDecoration:'none',fontWeight:600,border:'1px solid #c6e9d0'}}>
                 💬 Задать вопрос о товаре
               </a>
             </div>
@@ -587,18 +646,13 @@ function ProductCard({ product, onAddToCart, onOpen }) {
   const [imgIdx, setImgIdx] = useState(0)
   const imgs = product.images || []
   const hasVideo = !!product.video_url
-
   return (
     <div className={styles.prodCard} onClick={() => onOpen(product)}>
-      <div className={styles.prodImg}
-        onMouseEnter={() => imgs.length > 1 && setImgIdx(1)}
-        onMouseLeave={() => setImgIdx(0)}>
+      <div className={styles.prodImg} onMouseEnter={() => imgs.length>1&&setImgIdx(1)} onMouseLeave={() => setImgIdx(0)}>
         {imgs[imgIdx] && <img src={imgs[imgIdx]} alt={product.name} loading="lazy" />}
         {product.is_new && <span className={styles.tagNew}>New</span>}
         {hasVideo && <span className={styles.tagVideo}>▶ видео</span>}
-        <button className={styles.addBar} onClick={e => { e.stopPropagation(); onOpen(product) }}>
-          Выбрать размер →
-        </button>
+        <button className={styles.addBar} onClick={e=>{e.stopPropagation();onOpen(product)}}>Выбрать размер →</button>
       </div>
       <div className={styles.prodBody}>
         <div className={styles.prodCat}>{product.category}</div>
@@ -608,9 +662,7 @@ function ProductCard({ product, onAddToCart, onOpen }) {
           {product.old_price && <span className={styles.was}>{product.old_price.toLocaleString('ru')} ₽</span>}
         </div>
         {product.sizes?.length > 0 && (
-          <div className={styles.prodSizes}>
-            {product.sizes.map(s => <span key={s}>{s}</span>)}
-          </div>
+          <div className={styles.prodSizes}>{product.sizes.map(s=><span key={s}>{s}</span>)}</div>
         )}
       </div>
     </div>
