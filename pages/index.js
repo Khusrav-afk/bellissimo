@@ -1,302 +1,514 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
-import { supabase } from '../lib/supabase'
-import styles from '../styles/Home.module.css'
+import { supabase } from '../../lib/supabase'
 
-const FREE_DELIVERY = 10000
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'bellissimo2025'
+const CATEGORIES = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки']
+const BUCKET = 'product'
 
-export default function Home({ initialProducts }) {
-  const [products, setProducts] = useState(initialProducts || [])
-  const [cart, setCart] = useState([])
-  const [cartOpen, setCartOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('Все')
+export default function Admin() {
+  const [auth, setAuth] = useState(false)
+  const [password, setPassword] = useState('')
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState('list')
+  const [editProduct, setEditProduct] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [msg, setMsg] = useState({ text: '', type: '' })
+  const [search, setSearch] = useState('')
+  const [filterCat, setFilterCat] = useState('Все')
+  const [dragOver, setDragOver] = useState(false)
+  const [dragIdx, setDragIdx] = useState(null)
+  const fileInputRef = useRef()
+  const [settings, setSettings] = useState({ hero_title: 'Красота, которая ближе к телу', hero_subtitle: 'Будуарное нижнее бельё для особых моментов', hero_image: '', free_delivery_amount: 10000 })
+  const [settingsLoading, setSL] = useState(false)
 
-  const categories = ['Все', 'Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки']
+  const [form, setForm] = useState({
+    name: '', category: 'Комплекты', price: '', old_price: '',
+    description: '', sizes: '', is_new: false, active: true,
+    images: [], video_url: ''
+  })
 
-  const filtered = activeCategory === 'Все'
-    ? products
-    : products.filter(p => p.category === activeCategory)
+  useEffect(() => { if (auth) { loadProducts(); loadSettings() } }, [auth])
 
-  const cartTotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
-  const cartCount = cart.reduce((s, x) => s + x.qty, 0)
-  const leftForFree = FREE_DELIVERY - cartTotal
+  async function loadProducts() {
+    setLoading(true)
+    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    setProducts(data || [])
+    setLoading(false)
+  }
 
-  function addToCart(product) {
-    setCart(prev => {
-      const ex = prev.find(x => x.id === product.id)
-      if (ex) return prev.map(x => x.id === product.id ? { ...x, qty: x.qty + 1 } : x)
-      return [...prev, { ...product, qty: 1 }]
+  async function loadSettings() {
+    try {
+      const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
+      if (data) setSettings(data)
+    } catch(e) {}
+  }
+
+  async function saveSettings() {
+    setSL(true)
+    await supabase.from('settings').upsert({ id: 1, ...settings })
+    setSL(false)
+    showMsg('✅ Настройки сохранены!')
+  }
+
+  async function uploadFile(file, folder) {
+    const ext = file.name.split('.').pop().toLowerCase()
+    const filename = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from(BUCKET).upload(filename, file, { cacheControl: '3600', upsert: false, contentType: file.type })
+    if (error) throw error
+    const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(filename)
+    return publicUrl
+  }
+
+  async function handlePhotoUpload(files) {
+    const arr = Array.from(files).slice(0, 5 - form.images.length)
+    if (!arr.length) return
+    setUploading(true)
+    const urls = []
+    for (const file of arr) {
+      try { urls.push({ url: await uploadFile(file, 'images'), isMain: false }) }
+      catch(e) { showMsg('❌ Ошибка: ' + e.message, 'error') }
+    }
+    setForm(f => {
+      const imgs = [...f.images, ...urls]
+      if (imgs.length && !imgs.some(i => i.isMain)) imgs[0].isMain = true
+      return { ...f, images: imgs }
     })
-    setCartOpen(true)
+    setUploading(false)
   }
 
-  function removeFromCart(id) {
-    setCart(prev => prev.filter(x => x.id !== id))
+  async function handleVideoUpload(file) {
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadFile(file, 'videos')
+      setForm(f => ({ ...f, video_url: url }))
+      showMsg('✅ Видео загружено!')
+    } catch(e) { showMsg('❌ ' + e.message, 'error') }
+    setUploading(false)
   }
+
+  async function handleHeroUpload(file) {
+    if (!file) return
+    setSL(true)
+    try {
+      const url = await uploadFile(file, 'hero')
+      setSettings(s => ({ ...s, hero_image: url }))
+      showMsg('✅ Главное фото загружено!')
+    } catch(e) { showMsg('❌ ' + e.message, 'error') }
+    setSL(false)
+  }
+
+  function removeImage(idx) {
+    setForm(f => {
+      const imgs = f.images.filter((_, i) => i !== idx)
+      if (imgs.length && !imgs.some(i => i.isMain)) imgs[0].isMain = true
+      return { ...f, images: imgs }
+    })
+  }
+
+  function setMainImage(idx) {
+    setForm(f => ({ ...f, images: f.images.map((img, i) => ({ ...img, isMain: i === idx })) }))
+  }
+
+  function handleDragStart(idx) { setDragIdx(idx) }
+  function handleDropImg(e, idx) {
+    e.preventDefault()
+    if (dragIdx === null) return
+    setForm(f => {
+      const imgs = [...f.images]
+      const [moved] = imgs.splice(dragIdx, 1)
+      imgs.splice(idx, 0, moved)
+      return { ...f, images: imgs }
+    })
+    setDragIdx(null)
+  }
+
+  async function saveProduct() {
+    if (!form.name || !form.price) return showMsg('❌ Заполни название и цену', 'error')
+    const sorted = [...form.images].sort((a, b) => b.isMain - a.isMain)
+    const payload = {
+      name: form.name.trim(), category: form.category,
+      price: Number(form.price),
+      old_price: form.old_price ? Number(form.old_price) : null,
+      description: form.description.trim(),
+      sizes: form.sizes.split(',').map(s => s.trim()).filter(Boolean),
+      images: sorted.map(i => i.url),
+      video_url: form.video_url || null,
+      is_new: form.is_new, active: form.active
+    }
+    setLoading(true)
+    const fn = editProduct
+      ? supabase.from('products').update(payload).eq('id', editProduct.id)
+      : supabase.from('products').insert([payload])
+    const { error } = await fn
+    if (error) { showMsg('❌ ' + error.message, 'error'); setLoading(false); return }
+    showMsg(editProduct ? '✅ Товар обновлён!' : '✅ Товар добавлен!')
+    setLoading(false); resetForm(); loadProducts(); setTab('list')
+  }
+
+  async function toggleActive(p) {
+    await supabase.from('products').update({ active: !p.active }).eq('id', p.id)
+    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: !x.active } : x))
+  }
+
+  async function deleteProduct(id) {
+    if (!confirm('Удалить товар?')) return
+    await supabase.from('products').delete().eq('id', id)
+    setProducts(prev => prev.filter(x => x.id !== id))
+    showMsg('🗑 Удалено')
+  }
+
+  async function duplicateProduct(p) {
+    const { id, created_at, ...rest } = p
+    await supabase.from('products').insert([{ ...rest, name: rest.name + ' (копия)', active: false }])
+    loadProducts(); showMsg('✅ Продублировано')
+  }
+
+  function startEdit(p) {
+    setEditProduct(p)
+    setForm({
+      name: p.name || '', category: p.category || 'Комплекты',
+      price: p.price ? String(p.price) : '',
+      old_price: p.old_price ? String(p.old_price) : '',
+      description: p.description || '',
+      sizes: (p.sizes || []).join(', '),
+      is_new: p.is_new || false, active: p.active !== false,
+      images: (p.images || []).map((url, i) => ({ url, isMain: i === 0 })),
+      video_url: p.video_url || ''
+    })
+    setTab('add'); window.scrollTo(0, 0)
+  }
+
+  function resetForm() {
+    setEditProduct(null)
+    setForm({ name: '', category: 'Комплекты', price: '', old_price: '', description: '', sizes: '', is_new: false, active: true, images: [], video_url: '' })
+  }
+
+  function showMsg(text, type = 'success') {
+    setMsg({ text, type }); setTimeout(() => setMsg({ text: '', type: '' }), 4000)
+  }
+
+  const filtered = products.filter(p =>
+    (filterCat === 'Все' || p.category === filterCat) &&
+    (!search || p.name?.toLowerCase().includes(search.toLowerCase()))
+  )
+  const activeCount = products.filter(p => p.active).length
+
+  if (!auth) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', fontFamily:'sans-serif' }}>
+      <div style={{ background:'#fff', padding:48, borderRadius:20, boxShadow:'0 20px 60px rgba(0,0,0,.3)', textAlign:'center', width:360 }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>🌹</div>
+        <h2 style={{ fontFamily:'Georgia,serif', fontStyle:'italic', fontWeight:300, marginBottom:4, color:'#3a2f2b', fontSize:28 }}>Bellissimo</h2>
+        <p style={{ color:'#9e8e85', fontSize:13, marginBottom:32, letterSpacing:2, textTransform:'uppercase' }}>Панель управления</p>
+        {msg.text && <div style={{ background:'#fef2f2', color:'#c45c5c', padding:10, borderRadius:8, marginBottom:16, fontSize:13 }}>{msg.text}</div>}
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Введите пароль"
+          onKeyDown={e => e.key === 'Enter' && (password === ADMIN_PASSWORD ? setAuth(true) : showMsg('❌ Неверный пароль','error'))}
+          style={{ width:'100%', padding:'14px 16px', border:'2px solid #ede4dc', borderRadius:10, fontSize:15, marginBottom:16, outline:'none', boxSizing:'border-box', textAlign:'center', letterSpacing:4 }} />
+        <button onClick={() => password === ADMIN_PASSWORD ? setAuth(true) : showMsg('❌ Неверный пароль','error')}
+          style={{ width:'100%', padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600 }}>
+          Войти
+        </button>
+      </div>
+    </div>
+  )
+
+  const IS = { width:'100%', padding:'10px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', fontFamily:'sans-serif', background:'#fff', color:'#3a2f2b', boxSizing:'border-box' }
 
   return (
     <>
-      <Head>
-        <title>Bellissimo Lingerie — Будуарное нижнее бельё</title>
-        <meta name="description" content="Интернет-магазин будуарного нижнего белья. Доставка по всей России." />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Nunito+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-      </Head>
+      <Head><title>Bellissimo Admin</title></Head>
+      <div style={{ minHeight:'100vh', background:'#f8f4f1', fontFamily:"'Nunito Sans',sans-serif" }}>
 
-      {/* Announce */}
-      <div className={styles.announce}>
-        🎁 Бесплатная доставка при заказе от <strong>10 000 ₽</strong> по всей России
-      </div>
-
-      {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.hTop}>
-          <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
-            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
-            </svg>
-          </button>
-          <a href="/" className={styles.logo}>
-            <span className={styles.logoMain}>Bellissimo</span>
-            <span className={styles.logoSub}>Lingerie</span>
-          </a>
-          <button className={styles.cartBtn} onClick={() => setCartOpen(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
-            </svg>
-            {cartCount > 0 && <span className={styles.badge}>{cartCount}</span>}
-          </button>
-        </div>
-        <nav className={styles.nav}>
-          <div className={styles.navInner}>
-            {categories.map(cat => (
-              <button key={cat} className={`${styles.navLink} ${activeCategory === cat ? styles.active : ''}`} onClick={() => setActiveCategory(cat)}>
-                {cat}
+        <div style={{ background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', color:'#fff', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', height:58, position:'sticky', top:0, zIndex:50, boxShadow:'0 2px 16px rgba(0,0,0,.2)', flexWrap:'wrap', gap:8 }}>
+          <div style={{ fontFamily:'Georgia,serif', fontSize:18 }}>
+            <span style={{ color:'#f0c8d2', fontStyle:'italic' }}>Bellissimo</span>
+            <span style={{ opacity:.5, margin:'0 8px' }}>|</span>
+            <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {[['list','📋 Товары',products.length],['add','➕ Добавить'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
+              <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
+                style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400 }}>
+                {label}{count !== undefined ? ` (${count})` : ''}
               </button>
             ))}
+            <a href="/" target="_blank" style={{ padding:'6px 14px', background:'rgba(255,255,255,.12)', color:'#fff', borderRadius:7, fontSize:13, textDecoration:'none' }}>🌐 Сайт ↗</a>
           </div>
-        </nav>
-      </header>
-
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div className={styles.mobileMenu}>
-          <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
-          {categories.map(cat => (
-            <button key={cat} className={styles.mobileLink} onClick={() => { setActiveCategory(cat); setMenuOpen(false) }}>
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Hero */}
-      {products.length > 0 && (
-        <section className={styles.hero}>
-          <div className={styles.heroText}>
-            <div className={styles.heroTag}>Коллекция 2025</div>
-            <h1>Красота,<br />которая <em>ближе</em><br />к телу</h1>
-            <p>Будуарное нижнее бельё для тех, кто ценит нежность и элегантность.</p>
-            <div className={styles.heroBtns}>
-              <a href="#catalog" className={styles.btnFill}>Смотреть каталог</a>
-              <a href="#categories" className={styles.btnGhost}>Все категории</a>
-            </div>
-          </div>
-          <div className={styles.heroVisual}>
-            {products[0]?.images?.[0] && (
-              <img src={products[0].images[0]} alt="Bellissimo Lingerie" loading="eager" />
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Shipping bar */}
-      <div className={styles.shippingBar}>
-        <p>🚚 Заказы от <strong>10 000 ₽</strong> — бесплатно</p>
-        <div className={styles.shipDiv} />
-        <p>💳 Оплата картой <strong>МИР</strong></p>
-        <div className={styles.shipDiv} />
-        <p>📦 По всей <strong>России</strong></p>
-      </div>
-
-      {/* Catalog */}
-      <main className={styles.section} id="catalog">
-        <div className={styles.sHeader}>
-          <h2>{activeCategory === 'Все' ? 'Все товары' : activeCategory}</h2>
-          <p>{filtered.length} {filtered.length === 1 ? 'товар' : filtered.length < 5 ? 'товара' : 'товаров'}</p>
-          <div className={styles.dot} />
         </div>
 
-        {filtered.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>🛍️</div>
-            <p>В этой категории пока нет товаров</p>
-          </div>
-        ) : (
-          <div className={styles.prodGrid}>
-            {filtered.map(product => (
-              <ProductCard key={product.id} product={product} onAddToCart={addToCart} />
-            ))}
+        {msg.text && (
+          <div style={{ background:msg.type==='error'?'#fef2f2':'#edf7ed', color:msg.type==='error'?'#c45c5c':'#3a7a3a', padding:'10px 24px', textAlign:'center', fontWeight:600, fontSize:13 }}>
+            {msg.text}
           </div>
         )}
-      </main>
 
-      {/* Delivery */}
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <div className={styles.sHeader}><h2>Доставка</h2><p>Отправляем по всей России</p><div className={styles.dot} /></div>
-        <div className={styles.delCards}>
-          <div className={styles.delCard}><div className={styles.di}>📦</div><h4>СДЭК</h4><p>Пункт выдачи или курьер до двери.</p><div className={styles.cost}>от 290 ₽ · 2–5 дней</div></div>
-          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Любой населённый пункт.</p><div className={styles.cost}>от 250 ₽ · 5–10 дней</div></div>
-          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>от 350 ₽ · 1 день</div></div>
-        </div>
-        <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>10 000 ₽</strong></div>
-      </section>
+        <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 16px' }}>
 
-      {/* Trust */}
-      <section className={styles.trust}>
-        <div className={styles.trustGrid}>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>🌹</div><h4>Будуарный стиль</h4><p>Изысканное бельё для женщин, которые ценят красоту</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>📸</div><h4>Студийные фото</h4><p>Каждый товар в деталях — несколько ракурсов</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>💳</div><h4>Безопасная оплата</h4><p>Карта МИР, оплата после оформления</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>🎁</div><h4>Бережная упаковка</h4><p>Аккуратная упаковка для хрупких тканей</p></div>
-        </div>
-      </section>
-
-      {/* Social */}
-      <section className={styles.socialStrip}>
-        <h3>Мы в социальных сетях</h3>
-        <p>Следите за новинками и акциями</p>
-        <div className={styles.socialIcons}>
-          <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.socBtn}>Telegram</a>
-          <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.socBtn}>ВКонтакте</a>
-          <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.socBtn}>Instagram</a>
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.socBtn}>WhatsApp</a>
-        </div>
-      </section>
-
-      {/* Newsletter */}
-      <section className={styles.nl}>
-        <h2>Будьте в курсе</h2>
-        <p>Подпишитесь на новинки и получите скидку на первый заказ</p>
-        <div className={styles.nlForm}><input type="email" placeholder="Ваш e-mail" /><button>Подписаться</button></div>
-      </section>
-
-      {/* Footer */}
-      <footer className={styles.footer}>
-        <div className={styles.fGrid}>
-          <div className={styles.fBrand}>
-            <span className={styles.fLm}>Bellissimo</span>
-            <span className={styles.fLs}>Lingerie</span>
-            <p>Интернет-магазин будуарного нижнего белья. Доставка по всей России.</p>
-          </div>
-          <div>
-            <h5>Каталог</h5>
-            <ul>{categories.filter(c => c !== 'Все').map(c => <li key={c}><a href="#" onClick={() => setActiveCategory(c)}>{c}</a></li>)}</ul>
-          </div>
-          <div>
-            <h5>Покупателям</h5>
-            <ul>
-              <li><a href="#">Доставка и оплата</a></li>
-              <li><a href="#">Обмен и возврат</a></li>
-              <li><a href="#">Размерная сетка</a></li>
-              <li><a href="#">FAQ</a></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Контакты</h5>
-            <ul>
-              <li><a href="tel:+79114589339">+7 911 458-93-39</a></li>
-              <li><a href="tel:+79062108655">+7 906 210-86-55</a></li>
-              <li><a href="https://t.me/bellissimolingerie">Telegram</a></li>
-              <li><a href="https://wa.me/79114589339">WhatsApp</a></li>
-              <li><a href="https://vk.ru/bellissimolingerie">ВКонтакте</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className={styles.fBottom}>
-          <span>© 2025 Bellissimo Lingerie</span>
-          <div className={styles.fPay}><span>МИР</span><span>СБП</span></div>
-        </div>
-      </footer>
-
-      {/* Cart sidebar */}
-      {cartOpen && <div className={styles.cartOverlay} onClick={() => setCartOpen(false)} />}
-      <div className={`${styles.cartSidebar} ${cartOpen ? styles.open : ''}`}>
-        <div className={styles.cartHeader}>
-          <h3>Корзина</h3>
-          <button onClick={() => setCartOpen(false)}>✕</button>
-        </div>
-        <div className={styles.cartItems}>
-          {cart.length === 0 ? (
-            <div className={styles.cartEmpty}><div>🛍️</div><p>Корзина пуста</p></div>
-          ) : (
-            cart.map(item => (
-              <div key={item.id} className={styles.cartItem}>
-                {item.images?.[0] && <img src={item.images[0]} alt={item.name} />}
-                <div className={styles.cartItemInfo}>
-                  <div className={styles.cartItemName}>{item.name}</div>
-                  <div className={styles.cartItemCat}>{item.category} · {item.qty} шт</div>
-                  <div className={styles.cartItemPrice}>{(item.price * item.qty).toLocaleString('ru')} ₽</div>
-                </div>
-                <button className={styles.cartRemove} onClick={() => removeFromCart(item.id)}>×</button>
+          {tab === 'list' && (
+            <div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+                {[
+                  ['Всего товаров', products.length, '🛍️', '#c9748a'],
+                  ['Активных', activeCount, '✅', '#3a7a3a'],
+                  ['Скрытых', products.length - activeCount, '🙈', '#9e8e85'],
+                  ['Категорий', new Set(products.map(p=>p.category)).size, '📂', '#7c6d9a'],
+                ].map(([label,val,icon,color],i) => (
+                  <div key={i} style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:24 }}>{icon}</span>
+                    <div>
+                      <div style={{ fontSize:20, fontWeight:700, color }}>{val}</div>
+                      <div style={{ fontSize:11, color:'#9e8e85' }}>{label}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
+
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', marginBottom:14, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по названию..."
+                  style={{ flex:1, minWidth:180, padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none' }} />
+                <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{ padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', background:'#fff' }}>
+                  <option>Все</option>{CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                </select>
+                <span style={{ fontSize:12, color:'#9e8e85' }}>Найдено: {filtered.length}</span>
+              </div>
+
+              {loading ? (
+                <div style={{ textAlign:'center', padding:48, color:'#9e8e85' }}>⏳ Загрузка...</div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'48px 20px', color:'#9e8e85' }}>
+                  <div style={{ fontSize:48, marginBottom:12 }}>🛍️</div>
+                  <p style={{ marginBottom:16 }}>Товаров не найдено</p>
+                  <button onClick={()=>{setTab('add');resetForm()}} style={{ padding:'10px 24px', background:'#c9748a', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:14 }}>Добавить товар</button>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {filtered.map(p => (
+                    <div key={p.id} style={{ background:'#fff', border:`1.5px solid ${p.active?'#ede4dc':'#fca5a5'}`, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                      <div style={{ width:54, height:70, borderRadius:8, overflow:'hidden', background:'#faf3ed', flexShrink:0, position:'relative' }}>
+                        {p.images?.[0] && <img src={p.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />}
+                        {p.video_url && <div style={{ position:'absolute', bottom:2, right:2, background:'rgba(0,0,0,.6)', color:'#fff', fontSize:8, padding:'1px 3px', borderRadius:3 }}>▶</div>}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:'Georgia,serif', fontSize:14, marginBottom:3, color:'#3a2f2b', display:'flex', alignItems:'center', gap:6 }}>
+                          {p.is_new && <span style={{ background:'#c9748a', color:'#fff', fontSize:9, padding:'1px 5px', borderRadius:4, letterSpacing:1 }}>NEW</span>}
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize:11, color:'#9e8e85', display:'flex', gap:10, flexWrap:'wrap' }}>
+                          <span>{p.category}</span>
+                          <span style={{ color:'#c9748a', fontWeight:600 }}>{p.price?.toLocaleString('ru')} ₽</span>
+                          {p.old_price && <span style={{ textDecoration:'line-through' }}>{p.old_price?.toLocaleString('ru')} ₽</span>}
+                          {p.sizes?.length > 0 && <span>{p.sizes.join(', ')}</span>}
+                          <span>{p.images?.length||0} фото</span>
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
+                        <span style={{ padding:'3px 8px', borderRadius:5, fontSize:11, background:p.active?'#edf7ed':'#fef2f2', color:p.active?'#3a7a3a':'#c45c5c', fontWeight:600 }}>
+                          {p.active?'● Активен':'● Скрыт'}
+                        </span>
+                        <button onClick={()=>startEdit(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>✏️</button>
+                        <button onClick={()=>duplicateProduct(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }} title="Дублировать">📋</button>
+                        <button onClick={()=>toggleActive(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>{p.active?'🙈':'👁'}</button>
+                        <button onClick={()=>deleteProduct(p.id)} style={{ padding:'5px 9px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-        </div>
-        <div className={styles.cartFooter}>
-          <div className={styles.cartTotal}><span>Итого:</span><strong>{cartTotal.toLocaleString('ru')} ₽</strong></div>
-          <div className={`${styles.delivNote} ${leftForFree <= 0 ? styles.free : ''}`}>
-            {leftForFree <= 0
-              ? '🎉 Бесплатная доставка включена!'
-              : `Ещё ${leftForFree.toLocaleString('ru')} ₽ — доставка бесплатная`}
-          </div>
-          <button className={styles.orderBtn}>Оформить заказ</button>
+
+          {tab === 'add' && (
+            <div style={{ maxWidth:780 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>
+                {editProduct ? '✏️ Редактировать товар' : '➕ Новый товар'}
+              </h2>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:24 }}>
+
+                <div>
+                  <ST>📷 Фотографии (до 5 штук)</ST>
+                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Перетащи для смены порядка · Нажми ★ чтобы сделать фото главным</p>
+                  <div onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)}
+                    onDrop={e=>{e.preventDefault();setDragOver(false);handlePhotoUpload(e.dataTransfer.files)}}
+                    style={{ border:`2px dashed ${dragOver?'#c9748a':'#ede4dc'}`, borderRadius:12, padding:16, background:dragOver?'#fdf3f5':'#fafafa', transition:'all .2s', minHeight:120 }}>
+                    <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'flex-start' }}>
+                      {form.images.map((img, idx) => (
+                        <div key={idx} draggable onDragStart={()=>handleDragStart(idx)} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDropImg(e,idx)}
+                          style={{ position:'relative', width:90, height:120, borderRadius:10, overflow:'hidden', border:`2.5px solid ${img.isMain?'#c9748a':'#ede4dc'}`, cursor:'grab', background:'#f5f5f5', flexShrink:0 }}>
+                          <img src={img.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+                          <div style={{ position:'absolute', top:3, left:3, background:'rgba(0,0,0,.5)', color:'#fff', fontSize:9, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>{idx+1}</div>
+                          <button onClick={()=>setMainImage(idx)} title="Сделать главным"
+                            style={{ position:'absolute', top:3, right:22, width:18, height:18, borderRadius:'50%', background:img.isMain?'#c9748a':'rgba(255,255,255,.8)', border:'none', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center', color:img.isMain?'#fff':'#c9748a' }}>
+                            ★
+                          </button>
+                          <button onClick={()=>removeImage(idx)}
+                            style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'rgba(0,0,0,.6)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>×</button>
+                          {img.isMain && <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(201,116,138,.9)', color:'#fff', fontSize:8, textAlign:'center', padding:'2px 0', letterSpacing:1, fontWeight:700 }}>ГЛАВНОЕ</div>}
+                        </div>
+                      ))}
+                      {form.images.length < 5 && (
+                        <label style={{ width:90, height:120, borderRadius:10, border:'2px dashed #ede4dc', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:uploading?'wait':'pointer', color:'#9e8e85', fontSize:11, gap:4, background:'#fafafa', flexShrink:0 }}>
+                          {uploading ? <><span style={{ fontSize:22 }}>⏳</span><span>Загрузка</span></> : <><span style={{ fontSize:28, lineHeight:1 }}>+</span><span>Добавить фото</span></>}
+                          <input type="file" accept="image/*" multiple ref={fileInputRef} onChange={e=>handlePhotoUpload(e.target.files)} disabled={uploading} style={{ display:'none' }} />
+                        </label>
+                      )}
+                      {form.images.length === 0 && !uploading && (
+                        <div style={{ color:'#c9c0bb', fontSize:13, display:'flex', alignItems:'center', gap:8 }}>
+                          📸 Перетащи фото сюда или нажми «+»
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <ST>🎬 Видео товара (необязательно)</ST>
+                  {form.video_url ? (
+                    <div style={{ display:'flex', alignItems:'center', gap:12, padding:12, background:'#faf3ed', borderRadius:10, border:'1px solid #ede4dc' }}>
+                      <video src={form.video_url} style={{ width:80, height:55, objectFit:'cover', borderRadius:6 }} muted />
+                      <div style={{ flex:1 }}>
+                        <p style={{ fontSize:13, fontWeight:600, color:'#3a2f2b' }}>✅ Видео загружено</p>
+                        <p style={{ fontSize:11, color:'#9e8e85' }}>Будет показано в галерее товара</p>
+                      </div>
+                      <button onClick={()=>setForm(f=>({...f,video_url:''}))} style={{ padding:'5px 10px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontSize:12, color:'#c45c5c' }}>Удалить</button>
+                    </div>
+                  ) : (
+                    <label style={{ display:'flex', alignItems:'center', gap:12, padding:14, border:'2px dashed #ede4dc', borderRadius:10, cursor:'pointer', background:'#fafafa' }}>
+                      <span style={{ fontSize:28 }}>🎥</span>
+                      <div>
+                        <p style={{ fontSize:13, fontWeight:600, color:'#3a2f2b' }}>{uploading ? '⏳ Загрузка...' : 'Загрузить видео'}</p>
+                        <p style={{ fontSize:11, color:'#9e8e85' }}>MP4, до 50 МБ. Автоматически воспроизводится в галерее.</p>
+                      </div>
+                      <input type="file" accept="video/*" onChange={e=>handleVideoUpload(e.target.files[0])} style={{ display:'none' }} />
+                    </label>
+                  )}
+                </div>
+
+                <div>
+                  <ST>📝 Основная информация</ST>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                    <div style={{ gridColumn:'1/-1' }}>
+                      <LB>Название товара *</LB>
+                      <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Например: Белый кружевной корсет" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Категория *</LB>
+                      <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={IS}>
+                        {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <LB>Цена (₽) *</LB>
+                      <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="3500" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Старая цена (₽) — для скидки</LB>
+                      <input type="number" value={form.old_price} onChange={e=>setForm(f=>({...f,old_price:e.target.value}))} placeholder="4500 (необязательно)" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Размеры (через запятую)</LB>
+                      <input value={form.sizes} onChange={e=>setForm(f=>({...f,sizes:e.target.value}))} placeholder="XS, S, M, L, XL" style={IS} />
+                    </div>
+                    <div style={{ gridColumn:'1/-1' }}>
+                      <LB>Описание</LB>
+                      <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                        placeholder="Материал, особенности, рекомендации по уходу..." rows={3}
+                        style={{ ...IS, resize:'vertical', minHeight:80, lineHeight:1.5 }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <ST>⚙️ Параметры</ST>
+                  <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                    {[
+                      [form.is_new, v=>setForm(f=>({...f,is_new:v})), '🆕 Отметить как «New»'],
+                      [form.active, v=>setForm(f=>({...f,active:v})), '👁 Показывать на сайте'],
+                    ].map(([checked, onChange, label], i) => (
+                      <label key={i} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, color:'#3a2f2b', padding:'8px 14px', background:checked?'#fdf3f5':'#fafafa', borderRadius:8, border:`1.5px solid ${checked?'#c9748a':'#ede4dc'}`, transition:'all .2s' }}>
+                        <input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)} style={{ width:15, height:15, accentColor:'#c9748a' }} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display:'flex', gap:12, paddingTop:8, borderTop:'1px solid #ede4dc' }}>
+                  <button onClick={saveProduct} disabled={!form.name||!form.price||loading}
+                    style={{ flex:1, padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600, opacity:(!form.name||!form.price||loading)?.5:1 }}>
+                    {loading ? '⏳ Сохранение...' : editProduct ? '✅ Сохранить изменения' : '✅ Добавить товар'}
+                  </button>
+                  <button onClick={()=>{setTab('list');resetForm()}}
+                    style={{ padding:'14px 22px', background:'#f5f0ed', border:'1.5px solid #ede4dc', borderRadius:10, fontSize:14, cursor:'pointer', color:'#3a2f2b' }}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'settings' && (
+            <div style={{ maxWidth:680 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>⚙️ Настройки сайта</h2>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:22 }}>
+
+                <div>
+                  <ST>🖼️ Главный баннер (Hero-секция)</ST>
+                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:14 }}>Большое фото которое посетители видят при первом заходе на сайт</p>
+                  {settings.hero_image ? (
+                    <div style={{ position:'relative', width:'100%', height:180, borderRadius:12, overflow:'hidden', marginBottom:12 }}>
+                      <img src={settings.hero_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+                      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                        <label style={{ padding:'8px 16px', background:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
+                          Заменить
+                          <input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} />
+                        </label>
+                        <button onClick={()=>setSettings(s=>({...s,hero_image:''}))}
+                          style={{ padding:'8px 16px', background:'#fef2f2', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>Удалить</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:140, border:'2px dashed #ede4dc', borderRadius:12, cursor:'pointer', color:'#9e8e85', background:'#fafafa', marginBottom:12 }}>
+                      <span style={{ fontSize:36, marginBottom:8 }}>🖼️</span>
+                      <span style={{ fontSize:13 }}>Загрузить главное фото сайта</span>
+                      <input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} />
+                    </label>
+                  )}
+                  <div style={{ marginBottom:12 }}>
+                    <LB>Заголовок</LB>
+                    <input value={settings.hero_title} onChange={e=>setSettings(s=>({...s,hero_title:e.target.value}))} placeholder="Красота, которая ближе к телу" style={IS} />
+                  </div>
+                  <div>
+                    <LB>Подзаголовок</LB>
+                    <input value={settings.hero_subtitle} onChange={e=>setSettings(s=>({...s,hero_subtitle:e.target.value}))} placeholder="Будуарное нижнее бельё для особых моментов" style={IS} />
+                  </div>
+                </div>
+
+                <div>
+                  <ST>🚚 Бесплатная доставка</ST>
+                  <LB>Минимальная сумма заказа для бесплатной доставки (₽)</LB>
+                  <input type="number" value={settings.free_delivery_amount} onChange={e=>setSettings(s=>({...s,free_delivery_amount:Number(e.target.value)}))} placeholder="10000" style={IS} />
+                  <p style={{ fontSize:12, color:'#9e8e85', marginTop:6 }}>При достижении этой суммы покупатель получает бесплатную доставку</p>
+                </div>
+
+                <button onClick={saveSettings} disabled={settingsLoading}
+                  style={{ padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600, opacity:settingsLoading?.5:1 }}>
+                  {settingsLoading ? '⏳ Сохранение...' : '✅ Сохранить настройки'}
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </>
   )
 }
 
-function ProductCard({ product, onAddToCart }) {
-  const [imgIdx, setImgIdx] = useState(0)
-  const imgs = product.images || []
-
-  return (
-    <div className={styles.prodCard}>
-      <div className={styles.prodImg}
-        onMouseEnter={() => imgs.length > 1 && setImgIdx(1)}
-        onMouseLeave={() => setImgIdx(0)}>
-        {imgs[imgIdx] && <img src={imgs[imgIdx]} alt={product.name} loading="lazy" />}
-        {product.is_new && <span className={styles.tagNew}>New</span>}
-        <button className={styles.addBar} onClick={() => onAddToCart(product)}>+ В корзину</button>
-      </div>
-      <div className={styles.prodBody}>
-        <div className={styles.prodCat}>{product.category}</div>
-        <div className={styles.prodName}>{product.name}</div>
-        <div className={styles.prodPrices}>
-          <span className={styles.now}>{product.price?.toLocaleString('ru')} ₽</span>
-          {product.old_price && <span className={styles.was}>{product.old_price.toLocaleString('ru')} ₽</span>}
-        </div>
-        {product.sizes?.length > 0 && (
-          <div className={styles.prodSizes}>
-            {product.sizes.map(s => <span key={s}>{s}</span>)}
-          </div>
-        )}
-      </div>
-    </div>
-  )
+function ST({ children }) {
+  return <div style={{ fontSize:13, fontWeight:700, color:'#3a2f2b', marginBottom:10, paddingBottom:8, borderBottom:'1px solid #f0e8e0' }}>{children}</div>
 }
-
-export async function getServerSideProps() {
-  try {
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('active', true)
-      .order('created_at', { ascending: false })
-    return { props: { initialProducts: data || [] } }
-  } catch {
-    return { props: { initialProducts: [] } }
-  }
+function LB({ children }) {
+  return <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#9e8e85', letterSpacing:1, textTransform:'uppercase', marginBottom:5 }}>{children}</label>
 }
