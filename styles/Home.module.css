@@ -212,20 +212,20 @@ nav { background: var(--bg); border-bottom: 1px solid var(--border); }
 .modalClose:hover { background: rgba(0,0,0,.15); }
 
 /* ── Лайтбокс ── */
-.lbOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 16px; }
-.lbBox { background: #fff; border-radius: 20px; max-width: 920px; width: 100%; max-height: 92vh; overflow-y: auto; display: grid; grid-template-columns: 1fr 310px; grid-template-rows: auto auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,.4); }
-.lbClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.45); color: #fff; border: none; width: 34px; height: 34px; border-radius: 50%; font-size: 16px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; transition: background .2s; }
+.lbOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.lbBox { background: #fff; border-radius: 20px; max-width: 1160px; width: 100%; height: 90vh; display: grid; grid-template-columns: 1fr 320px; grid-template-rows: 1fr auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; }
+.lbClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.45); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; transition: background .2s; }
 .lbClose:hover { background: rgba(0,0,0,.75); }
-.lbMain { position: relative; background: var(--bg2); border-radius: 20px 0 0 0; overflow: hidden; aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center; }
-.lbImg { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
-.lbPrev, .lbNext { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.9); border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,.15); transition: all .2s; }
-.lbPrev { left: 12px; }
-.lbNext { right: 12px; }
-.lbPrev:hover, .lbNext:hover { background: #fff; }
-.lbThumbs { display: flex; gap: 8px; padding: 10px 14px; background: var(--bg2); border-radius: 0 0 0 20px; flex-wrap: wrap; }
-.lbThumb { width: 56px; height: 74px; border-radius: 8px; cursor: pointer; opacity: .55; transition: opacity .2s; border: 2.5px solid transparent; flex-shrink: 0; }
+.lbMain { position: relative; background: #f5f0ec; border-radius: 20px 0 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.lbImg { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.lbPrev, .lbNext { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.92); border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 12px rgba(0,0,0,.15); transition: all .2s; }
+.lbPrev { left: 16px; }
+.lbNext { right: 16px; }
+.lbPrev:hover, .lbNext:hover { background: #fff; transform: translateY(-50%) scale(1.05); }
+.lbThumbs { display: flex; gap: 8px; padding: 10px 16px; background: #f5f0ec; border-radius: 0 0 0 20px; flex-wrap: wrap; align-items: center; }
+.lbThumb { width: 62px; height: 80px; border-radius: 8px; cursor: pointer; opacity: .5; transition: opacity .2s, border-color .2s; border: 2.5px solid transparent; flex-shrink: 0; overflow: hidden; }
 .lbThumbActive { opacity: 1; border-color: var(--accent); }
-.lbInfo { padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; grid-row: 1 / 3; overflow-y: auto; }
+.lbInfo { padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; grid-row: 1 / 3; overflow-y: auto; border-left: 1px solid var(--border); }
 .lbCat { font-size: 10px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
 .lbName { font-family: var(--serif); font-size: 22px; font-weight: 400; line-height: 1.3; color: var(--text); }
 .lbPrices { display: flex; align-items: center; gap: 10px; }
@@ -251,9 +251,9 @@ nav { background: var(--bg); border-bottom: 1px solid var(--border); }
   .prodGrid { grid-template-columns: repeat(2, 1fr); }
   .trustGrid, .delCards { grid-template-columns: repeat(2, 1fr); }
   .fGrid { grid-template-columns: 1fr 1fr; }
-  .lbBox { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
-  .lbInfo { grid-row: auto; }
-  .lbMain { border-radius: 20px 20px 0 0; aspect-ratio: 4/3; }
+  .lbBox { grid-template-columns: 1fr; grid-template-rows: 60vh auto auto; height: auto; max-height: 95vh; overflow-y: auto; }
+  .lbInfo { grid-row: auto; border-left: none; border-top: 1px solid var(--border); }
+  .lbMain { border-radius: 20px 20px 0 0; min-height: 60vh; }
   .lbThumbs { border-radius: 0; }
 }
 @media (max-width: 768px) {
