@@ -1,46 +1,34 @@
-/* ── CSS переменные в globals.css ── */
+/* Переменные — в globals.css */
 
+/* ── Объявление ── */
 .announce { background: var(--accent); color: #fff; text-align: center; padding: 10px 16px; font-size: 13px; letter-spacing: .5px; }
 .announce strong { font-weight: 600; }
 
 /* ── Шапка ── */
-.header { background: rgba(253,249,246,.94); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
+.header { background: rgba(253,249,246,.96); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
 .hTop { max-width: 1320px; margin: 0 auto; padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; }
+
+/* Левая часть шапки: соцсети */
+.hLeft { display: flex; align-items: center; gap: 8px; }
+.hSocials { display: flex; gap: 2px; }
+.hSocBtn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: none; color: var(--muted); text-decoration: none; transition: background .2s, color .2s; }
+.hSocBtn:hover { background: var(--bg2); color: var(--accent); }
 
 /* Логотип */
 .logo { font-family: var(--serif); text-decoration: none; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .logoMain { font-style: italic; color: var(--accent); font-size: 28px; letter-spacing: 3px; }
 .logoSub { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); font-family: var(--sans); font-weight: 300; }
 
-/* Иконки шапки — все одного вида */
-.hActions { display: flex; gap: 4px; align-items: center; }
-.hBtn {
-  display: flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 10px;
-  background: none; border: none; cursor: pointer;
-  color: var(--text); text-decoration: none;
-  transition: background .2s, color .2s;
-  flex-shrink: 0;
-}
+/* Правая часть: иконки действий */
+.hActions { display: flex; gap: 2px; align-items: center; }
+.hBtn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; }
 .hBtn:hover { background: var(--bg2); color: var(--accent); }
-.hBtn svg { width: 20px; height: 20px; display: block; }
-
-/* Корзина с бейджем */
-.cartBtn {
-  display: flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 10px;
-  background: none; border: none; cursor: pointer;
-  color: var(--text); text-decoration: none;
-  transition: background .2s, color .2s;
-  position: relative; flex-shrink: 0;
-}
+.cartBtn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; position: relative; }
 .cartBtn:hover { background: var(--bg2); color: var(--accent); }
-.cartBtn svg { width: 20px; height: 20px; display: block; }
 .badge { position: absolute; top: 4px; right: 4px; background: var(--accent); color: #fff; font-size: 9px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
 
 /* Мобильная кнопка */
-.mobileToggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; transition: background .2s; }
-.mobileToggle:hover { background: var(--bg2); }
+.mobileToggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; }
 
 /* ── Поиск ── */
 .searchBar { border-top: 1px solid var(--border); background: var(--bg); }
@@ -49,13 +37,14 @@
 .searchResults { max-width: 1320px; margin: 0 auto; padding: 0 40px 16px; display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
 .searchItem { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: background .2s; }
 .searchItem:hover { background: var(--bg2); }
-.searchItem img { width: 44px; height: 58px; object-fit: cover; object-position: top; border-radius: 6px; background: var(--bg2); }
+.searchItem img { width: 44px; height: 58px; object-fit: cover; object-position: top; border-radius: 6px; }
 
 /* ── Навигация ── */
 .nav { background: var(--bg); border-bottom: 1px solid var(--border); }
 .navInner { max-width: 1320px; margin: 0 auto; padding: 0 40px; display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
 .navLink { display: inline-block; padding: 12px 10px; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; background: none; border: none; color: var(--muted); font-weight: 500; cursor: pointer; font-family: var(--sans); position: relative; transition: color .3s; }
-.navLink:hover, .navLink.active { color: var(--accent); }
+.navLink:hover { color: var(--accent); }
+.navLink.active { color: var(--accent); }
 .navLink.active::after { content: ''; position: absolute; bottom: 8px; left: 10px; right: 10px; height: 2px; background: var(--accent); border-radius: 1px; }
 
 /* ── Мобильное меню ── */
@@ -69,7 +58,6 @@
 .heroTag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent-dark); margin-bottom: 24px; font-weight: 600; }
 .heroTag::before { content: ''; width: 24px; height: 1px; background: var(--accent); }
 .heroText h1 { font-family: var(--serif); font-size: 46px; font-weight: 300; line-height: 1.15; margin-bottom: 20px; color: var(--text); }
-.heroText h1 em { font-style: italic; color: var(--accent); }
 .heroText p { color: var(--muted); font-size: 15px; max-width: 400px; margin-bottom: 32px; font-weight: 300; line-height: 1.7; }
 .heroBtns { display: flex; gap: 12px; flex-wrap: wrap; }
 .btnFill { display: inline-flex; align-items: center; padding: 13px 30px; font-family: var(--sans); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; text-decoration: none; background: var(--accent); color: #fff; border: none; cursor: pointer; border-radius: var(--radius-sm); font-weight: 600; transition: background .3s; }
@@ -94,21 +82,20 @@
 
 /* ── Фильтр категорий ── */
 .catFilter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; justify-content: center; }
-.catBtn { padding: 7px 16px; border: 1.5px solid var(--border); border-radius: 20px; background: #fff; color: var(--muted); font-size: 12px; cursor: pointer; transition: all .2s; font-family: var(--sans); letter-spacing: .5px; }
+.catBtn { padding: 7px 16px; border: 1.5px solid var(--border); border-radius: 20px; background: #fff; color: var(--muted); font-size: 12px; cursor: pointer; transition: all .2s; font-family: var(--sans); }
 .catBtn:hover { border-color: var(--accent); color: var(--accent); }
-.catBtnActive { background: var(--accent); color: #fff !important; border-color: var(--accent); font-weight: 600; }
+.catBtnActive { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 
 /* ── Карточки товаров ── */
 .prodGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.prodCard { background: var(--card); border-radius: var(--radius); overflow: hidden; transition: transform .4s, box-shadow .4s; cursor: pointer; }
-.prodCard:hover { transform: translateY(-5px); box-shadow: 0 20px 48px rgba(58,47,43,.08); }
-.prodImg { aspect-ratio: 3/4; position: relative; overflow: hidden; background: var(--bg2); }
-.prodImg img { width: 100%; height: 100%; object-fit: cover; object-position: top center; transition: transform .5s; }
-.prodCard:hover .prodImg img { transform: scale(1.05); }
-.tagNew { position: absolute; top: 12px; left: 12px; padding: 4px 12px; border-radius: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; z-index: 2; background: var(--accent); color: #fff; }
-.tagVideo { position: absolute; bottom: 52px; left: 12px; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: 600; z-index: 2; background: rgba(58,47,43,.75); color: #fff; }
-.addBar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(58,47,43,.88); color: #fff; padding: 12px; text-align: center; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; transform: translateY(100%); transition: transform .35s; cursor: pointer; font-weight: 600; z-index: 2; border: none; font-family: var(--sans); width: 100%; }
-.prodCard:hover .addBar { transform: translateY(0); }
+.prodCard { background: var(--card); border-radius: var(--radius); overflow: hidden; }
+.prodImg { aspect-ratio: 3/4; position: relative; overflow: hidden; background: var(--bg2); cursor: pointer; }
+.prodImg img { width: 100%; height: 100%; object-fit: cover; object-position: top center; transition: transform .5s; display: block; }
+.prodImg:hover img { transform: scale(1.05); }
+.tagNew { position: absolute; top: 12px; left: 12px; padding: 4px 12px; border-radius: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; z-index: 2; background: var(--accent); color: #fff; pointer-events: none; }
+.tagVideo { position: absolute; bottom: 52px; left: 12px; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: 600; z-index: 2; background: rgba(58,47,43,.75); color: #fff; pointer-events: none; }
+.addBar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(58,47,43,.88); color: #fff; padding: 12px; text-align: center; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; transform: translateY(100%); transition: transform .35s; cursor: pointer; font-weight: 600; z-index: 3; border: none; font-family: var(--sans); width: 100%; }
+.prodImg:hover .addBar { transform: translateY(0); }
 .prodBody { padding: 16px 14px 18px; }
 .prodCat { font-size: 10px; color: var(--accent-dark); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
 .prodName { font-family: var(--serif); font-size: 15px; font-weight: 400; margin-bottom: 6px; line-height: 1.3; color: var(--text); }
@@ -126,7 +113,7 @@
 /* ── Доставка ── */
 .delCards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .delCard { background: var(--card); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 28px 22px; text-align: center; transition: all .3s; }
-.delCard:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 12px 32px rgba(201,116,138,.1); }
+.delCard:hover { border-color: var(--accent); transform: translateY(-3px); }
 .di { font-size: 30px; margin-bottom: 12px; }
 .delCard h4 { font-family: var(--serif); font-size: 18px; font-weight: 400; margin-bottom: 6px; }
 .delCard p { font-size: 13px; color: var(--muted); font-weight: 300; margin-bottom: 10px; line-height: 1.5; }
@@ -150,13 +137,28 @@
 .waBtn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: #25d366; color: #fff; text-decoration: none; border-radius: var(--radius-sm); font-weight: 700; font-size: 14px; transition: all .3s; white-space: nowrap; }
 .waBtn:hover { background: #1ebe5a; transform: translateY(-2px); }
 
-/* ── Соцсети ── */
+/* ── Соцсети секция ── */
 .socialStrip { max-width: 1320px; margin: 0 auto; padding: 64px 40px; text-align: center; }
 .socialStrip h3 { font-family: var(--serif); font-size: 24px; font-weight: 300; margin-bottom: 6px; }
 .socialStrip p { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
 .socialIcons { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.socBtn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; text-decoration: none; transition: all .3s; font-family: var(--sans); border: 1.5px solid var(--border); color: var(--text); }
-.socBtn:hover { border-color: var(--accent); color: var(--accent); }
+.socBtn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; text-decoration: none; transition: all .25s; font-family: var(--sans); border: 1.5px solid var(--border); color: var(--text); }
+.socTg:hover { background: #229ED9; color: #fff; border-color: #229ED9; }
+.socVk:hover { background: #0077FF; color: #fff; border-color: #0077FF; }
+.socInst:hover { background: #e1306c; color: #fff; border-color: #e1306c; }
+.socWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
+
+/* ── Плавающий виджет соцсетей СЛЕВА ── */
+.socialFloat { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; }
+.sfBtn { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--card); color: var(--muted); text-decoration: none; border-right: 3px solid var(--accent); transition: all .25s; box-shadow: 2px 0 16px rgba(0,0,0,.1); }
+.sfBtn:first-child { border-radius: 0 8px 0 0; }
+.sfBtn:last-child { border-radius: 0 0 8px 0; }
+.sfBtn:hover { background: var(--accent); color: #fff; width: 58px; border-right-color: var(--accent-dark); }
+
+/* ── Футер соцсети ── */
+.fSocials { display: flex; gap: 10px; margin-top: 16px; }
+.fSocials a { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all .25s; }
+.fSocials a:hover { background: var(--accent); color: #fff; }
 
 /* ── Подписка ── */
 .nl { padding: 72px 40px; text-align: center; background: linear-gradient(135deg, #3a2f2b, #5a3f48); color: #fff; }
@@ -165,8 +167,7 @@
 .nlForm { display: flex; max-width: 440px; margin: 0 auto; }
 .nlForm input { flex: 1; padding: 13px 18px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #fff; font-family: var(--sans); font-size: 14px; border-radius: var(--radius-sm) 0 0 var(--radius-sm); outline: none; }
 .nlForm input::placeholder { color: rgba(255,255,255,.35); }
-.nlForm button { padding: 13px 22px; background: var(--accent); color: #fff; border: none; font-family: var(--sans); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-weight: 600; transition: background .3s; }
-.nlForm button:hover { background: var(--accent-dark); }
+.nlForm button { padding: 13px 22px; background: var(--accent); color: #fff; border: none; font-family: var(--sans); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; font-weight: 600; }
 
 /* ── Футер ── */
 .footer { background: #3a2f2b; color: rgba(255,255,255,.55); padding: 56px 40px 28px; }
@@ -194,36 +195,33 @@
 .cartEmpty { text-align: center; color: var(--muted); padding: 48px 24px; font-size: 14px; }
 .cartEmpty div { font-size: 48px; margin-bottom: 16px; }
 .cartItem { display: flex; gap: 12px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-.cartItem img { width: 68px; height: 90px; object-fit: cover; object-position: top; border-radius: 8px; background: var(--bg2); flex-shrink: 0; }
+.cartItem img { width: 68px; height: 90px; object-fit: cover; object-position: top; border-radius: 8px; flex-shrink: 0; }
 .cartItemInfo { flex: 1; min-width: 0; }
 .cartItemName { font-family: var(--serif); font-size: 13px; margin-bottom: 3px; color: var(--text); }
 .cartItemCat { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 .cartItemPrice { font-weight: 700; font-size: 14px; color: var(--accent-dark); }
-.cartRemove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; align-self: flex-start; padding: 0; line-height: 1; flex-shrink: 0; }
+.cartRemove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; align-self: flex-start; padding: 0; flex-shrink: 0; }
 .cartFooter { padding: 20px; border-top: 1px solid var(--border); }
-.cartTotal { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 16px; font-weight: 600; color: var(--text); }
+.cartTotal { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 16px; font-weight: 600; }
 .orderBtn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-family: var(--sans); font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; font-weight: 700; transition: background .3s; }
 .orderBtn:hover { background: var(--accent-dark); }
 
 /* ── Модальные окна ── */
 .modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 550; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .modalBox { background: #fff; border-radius: 20px; max-width: 480px; width: 100%; padding: 32px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
-.modalClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.07); color: var(--text); border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .2s; }
-.modalClose:hover { background: rgba(0,0,0,.15); }
+.modalClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.07); color: var(--text); border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
 /* ── Лайтбокс ── */
 .lbOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .lbBox { background: #fff; border-radius: 20px; max-width: 1160px; width: 100%; height: 90vh; display: grid; grid-template-columns: 1fr 320px; grid-template-rows: 1fr auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; }
-.lbClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.45); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; transition: background .2s; }
-.lbClose:hover { background: rgba(0,0,0,.75); }
+.lbClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.45); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; }
 .lbMain { position: relative; background: #f5f0ec; border-radius: 20px 0 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 .lbImg { width: 100%; height: 100%; object-fit: contain; object-position: center; }
-.lbPrev, .lbNext { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.92); border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 12px rgba(0,0,0,.15); transition: all .2s; }
+.lbPrev,.lbNext { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.92); border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
 .lbPrev { left: 16px; }
 .lbNext { right: 16px; }
-.lbPrev:hover, .lbNext:hover { background: #fff; transform: translateY(-50%) scale(1.05); }
 .lbThumbs { display: flex; gap: 8px; padding: 10px 16px; background: #f5f0ec; border-radius: 0 0 0 20px; flex-wrap: wrap; align-items: center; }
-.lbThumb { width: 62px; height: 80px; border-radius: 8px; cursor: pointer; opacity: .5; transition: opacity .2s, border-color .2s; border: 2.5px solid transparent; flex-shrink: 0; overflow: hidden; }
+.lbThumb { width: 62px; height: 80px; border-radius: 8px; cursor: pointer; opacity: .5; transition: opacity .2s; border: 2.5px solid transparent; flex-shrink: 0; overflow: hidden; }
 .lbThumbActive { opacity: 1; border-color: var(--accent); }
 .lbInfo { padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; grid-row: 1 / 3; overflow-y: auto; border-left: 1px solid var(--border); }
 .lbCat { font-size: 10px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
@@ -235,7 +233,7 @@
 .lbSizes { display: flex; flex-wrap: wrap; gap: 6px; }
 .lbSize { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--muted); cursor: pointer; transition: all .2s; }
 .lbSize:hover { border-color: var(--accent); color: var(--accent); }
-.lbSizeActive { border-color: var(--accent) !important; color: var(--accent) !important; background: #fdf3f5; font-weight: 700; }
+.lbSizeActive { border-color: var(--accent); color: var(--accent); background: #fdf3f5; font-weight: 700; }
 .lbAddBtn { padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; font-weight: 700; font-family: var(--sans); transition: background .3s; }
 .lbAddBtn:hover { background: var(--accent-dark); }
 
@@ -249,7 +247,7 @@
   .heroVisual { min-height: 400px; }
   .heroText { padding: 48px 40px; }
   .prodGrid { grid-template-columns: repeat(2, 1fr); }
-  .trustGrid, .delCards { grid-template-columns: repeat(2, 1fr); }
+  .trustGrid,.delCards { grid-template-columns: repeat(2, 1fr); }
   .fGrid { grid-template-columns: 1fr 1fr; }
   .lbBox { grid-template-columns: 1fr; grid-template-rows: 60vh auto auto; height: auto; max-height: 95vh; overflow-y: auto; }
   .lbInfo { grid-row: auto; border-left: none; border-top: 1px solid var(--border); }
@@ -257,6 +255,7 @@
   .lbThumbs { border-radius: 0; }
 }
 @media (max-width: 768px) {
+  .hSocials { display: none; }
   .navInner { display: none; }
   .mobileToggle { display: flex; }
   .hTop { padding: 12px 20px; }
@@ -264,43 +263,18 @@
   .heroText { padding: 36px 20px; }
   .heroText h1 { font-size: 32px; }
   .prodGrid { grid-template-columns: repeat(2, 1fr); }
-  .delCards, .trustGrid { grid-template-columns: 1fr; }
+  .delCards,.trustGrid { grid-template-columns: 1fr; }
   .fGrid { grid-template-columns: 1fr; }
   .fBottom { flex-direction: column; text-align: center; }
   .shippingBar { margin: 16px 20px; padding: 14px; flex-direction: column; }
   .shipDiv { display: none; }
   .socialStrip { padding: 48px 20px; }
-  .trust, .nl, .waBanner { padding: 40px 20px; }
+  .trust,.nl,.waBanner { padding: 40px 20px; }
   .waInner { flex-direction: column; text-align: center; }
   .searchInner { padding: 10px 20px; }
   .searchResults { padding: 0 20px 12px; }
-  .catFilter { justify-content: flex-start; }
-  .modalBox { padding: 24px 20px; }
+  .socialFloat { display: none; }
 }
 @media (max-width: 480px) {
   .cartSidebar { width: 100vw; }
-  .lbName { font-size: 18px; }
-  .lbPrice { font-size: 18px; }
-}
-
-/* ── Плавающие иконки соцсетей (справа) ── */
-.socialFloat { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; gap: 0; }
-.sfBtn { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: #fff; color: var(--text); text-decoration: none; border-right: none; border-left: 3px solid var(--accent); transition: all .25s; box-shadow: -2px 0 12px rgba(0,0,0,.08); }
-.sfBtn:first-child { border-radius: 8px 0 0 0; }
-.sfBtn:last-child { border-radius: 0 0 0 8px; }
-.sfBtn:hover { background: var(--accent); color: #fff; width: 52px; }
-
-/* ── Соцсети с цветными hover ── */
-.socTg:hover { background: #229ED9; color: #fff; border-color: #229ED9; }
-.socVk:hover { background: #0077FF; color: #fff; border-color: #0077FF; }
-.socInst:hover { background: #e1306c; color: #fff; border-color: #e1306c; }
-.socWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
-
-/* ── Иконки соцсетей в футере ── */
-.fSocials { display: flex; gap: 10px; margin-top: 16px; }
-.fSocials a { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all .25s; }
-.fSocials a:hover { background: var(--accent); color: #fff; }
-
-@media (max-width: 768px) {
-  .socialFloat { display: none; }
 }
