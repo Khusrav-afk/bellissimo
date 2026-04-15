@@ -22,11 +22,13 @@ export default function Home({ initialProducts, settings }) {
   const [wishlistOpen, setWishlistOpen] = useState(false)
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
-  const categories = ['Все','Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки']
+  const categories = ['Все','Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники','Скидки']
   const searchResults = searchQuery.length > 1
     ? products.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || p.category?.toLowerCase().includes(searchQuery.toLowerCase()))
     : []
-  const filtered = activeCategory === 'Все' ? products : products.filter(p => p.category === activeCategory)
+  const filtered = activeCategory === 'Все' ? products 
+    : activeCategory === 'Скидки' ? products.filter(p => p.old_price && p.old_price > p.price)
+    : products.filter(p => p.category === activeCategory)
   const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
   const deliveryCost = cartTotal >= FREE_DELIVERY ? 0 : 350
@@ -274,7 +276,7 @@ export default function Home({ initialProducts, settings }) {
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroText}>
-          <div className={styles.heroTag}>Коллекция 2025</div>
+          <div className={styles.heroTag}>Коллекция 2026</div>
           <h1>{heroTitle}</h1>
           <p>{heroSubtitle}</p>
           <div className={styles.heroBtns}>
@@ -295,7 +297,7 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.shipDiv}/>
         <p>📦 По всей <strong>России</strong></p>
         <div className={styles.shipDiv}/>
-        <p>↩️ Обмен <strong>14 дней</strong></p>
+        <p>🔒 Без <strong>возврата</strong></p>
       </div>
 
       {/* Каталог */}
@@ -331,11 +333,16 @@ export default function Home({ initialProducts, settings }) {
       <section className={styles.section} style={{paddingTop:0}}>
         <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p><div className={styles.dot}/></div>
         <div className={styles.delCards}>
-          <div className={styles.delCard}><div className={styles.di}>📦</div><h4>СДЭК</h4><p>Пункт выдачи или курьер до двери.</p><div className={styles.cost}>от 290 ₽ · 2–5 дней</div></div>
-          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Любой населённый пункт страны.</p><div className={styles.cost}>от 250 ₽ · 5–10 дней</div></div>
-          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>от 350 ₽ · 1 день</div></div>
+          <div className={styles.delCard}><div className={styles.di}>📦</div><h4>СДЭК</h4><p>Пункт выдачи или курьер до двери.</p><div className={styles.cost}>{settings?.delivery_cdek || 'от 290 ₽ · 2–5 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Любой населённый пункт страны.</p><div className={styles.cost}>{settings?.delivery_post || 'от 250 ₽ · 5–10 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>{settings?.delivery_courier || 'от 350 ₽ · 1 день'}</div></div>
         </div>
         <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
+        {settings?.return_policy && (
+          <div style={{textAlign:'center',marginTop:12,padding:'12px 20px',background:'#fef8f5',borderRadius:10,fontSize:13,color:'var(--muted)',border:'1px solid #ede4dc'}}>
+            🔒 {settings.return_policy}
+          </div>
+        )}
       </section>
 
       {/* Преимущества */}
@@ -343,7 +350,7 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.trustGrid}>
           <div className={styles.trustItem}><div className={styles.trustIcon}>🌹</div><h4>Будуарный стиль</h4><p>Изысканное бельё для особых моментов</p></div>
           <div className={styles.trustItem}><div className={styles.trustIcon}>📸</div><h4>Студийные фото</h4><p>Каждый товар — несколько ракурсов и видео</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>↩️</div><h4>Обмен 14 дней</h4><p>Не подошёл размер — обменяем</p></div>
+          <div className={styles.trustItem}><div className={styles.trustIcon}>🔒</div><h4>Без возврата</h4><p>Нижнее бельё не подлежит обмену и возврату по санитарным нормам</p></div>
           <div className={styles.trustItem}><div className={styles.trustIcon}>🎁</div><h4>Бережная упаковка</h4><p>Аккуратная упаковка для хрупких тканей</p></div>
         </div>
       </section>
@@ -398,7 +405,7 @@ export default function Home({ initialProducts, settings }) {
             <ul>
               <li><a href="#" onClick={e=>{e.preventDefault();setSizeChartOpen(true)}}>Размерная сетка</a></li>
               <li><a href="#">Доставка и оплата</a></li>
-              <li><a href="#">Обмен и возврат</a></li>
+              <li><a href="#">Условия продажи</a></li>
               <li><a href="#">FAQ</a></li>
             </ul>
           </div>
@@ -414,7 +421,7 @@ export default function Home({ initialProducts, settings }) {
           </div>
         </div>
         <div className={styles.fBottom}>
-          <span>© 2025 Bellissimo Lingerie. Все права защищены.</span>
+          <span>© 2026 Bellissimo Lingerie. Все права защищены.</span>
           <div className={styles.fPay}><span>МИР</span><span>СБП</span></div>
         </div>
       </footer>
@@ -654,7 +661,7 @@ export default function Home({ initialProducts, settings }) {
               {/* Быстрые факты */}
               <div className={styles.lbFacts}>
                 <div className={styles.lbFact}><span>🚚</span><span>Доставка 2–7 дней по России</span></div>
-                <div className={styles.lbFact}><span>↩️</span><span>Обмен в течение 14 дней</span></div>
+                <div className={styles.lbFact}><span>🔒</span><span>Товар не подлежит обмену и возврату</span></div>
                 <div className={styles.lbFact}><span>💳</span><span>Оплата картой МИР</span></div>
               </div>
 
