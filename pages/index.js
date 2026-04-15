@@ -64,8 +64,8 @@ export default function Home({ initialProducts, settings }) {
   function changeQty(key, delta) {
     setCart(prev => prev.map(x => {
       if (x.key !== key) return x
-      const newQty = x.qty + delta
-      return newQty < 1 ? null : {...x, qty: newQty}
+      const q = x.qty + delta
+      return q < 1 ? null : {...x, qty: q}
     }).filter(Boolean))
   }
 
@@ -77,12 +77,12 @@ export default function Home({ initialProducts, settings }) {
   function closeLightbox() { setLightbox(null); document.body.style.overflow = '' }
 
   function nextMedia() {
-    if (!lightbox) return
+    if (!lightbox || lbTotal <= 1) return
     setLightbox(l => ({...l, mediaIdx: (l.mediaIdx + 1) % lbTotal}))
   }
 
   function prevMedia() {
-    if (!lightbox) return
+    if (!lightbox || lbTotal <= 1) return
     setLightbox(l => ({...l, mediaIdx: (l.mediaIdx - 1 + lbTotal) % lbTotal}))
   }
 
@@ -101,6 +101,12 @@ export default function Home({ initialProducts, settings }) {
     setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
   }
 
+  // SVG иконки соцсетей
+  const TgIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
+  const VkIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M21.547 7h-3.29a.743.743 0 0 0-.655.392s-1.312 2.416-1.734 3.23C14.734 12.813 14 12.126 14 11.11V7.603A1.104 1.104 0 0 0 12.896 6.5h-2.474a1.982 1.982 0 0 0-1.75.813s1.255-.204 1.255 1.49c0 .42.022 1.626.04 2.64a.73.73 0 0 1-1.272.503 21.54 21.54 0 0 1-2.498-4.543.693.693 0 0 0-.63-.403h-2.99a.508.508 0 0 0-.48.503s1.954 4.76 4.355 7.17C9.77 16.17 12.17 16 12.17 16h1.797a.61.61 0 0 0 .61-.61v-1.03a.61.61 0 0 1 1.03-.443l2.4 2.303a1.123 1.123 0 0 0 .773.307h2.604a.508.508 0 0 0 .48-.503 12.993 12.993 0 0 0-1.88-3.865.073.073 0 0 1 .005-.085A26.974 26.974 0 0 0 22 7.49a.508.508 0 0 0-.453-.49z"/></svg>
+  const InstaIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
+  const WaIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/></svg>
+
   return (
     <>
       <Head>
@@ -110,31 +116,14 @@ export default function Home({ initialProducts, settings }) {
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Nunito+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
 
-      {/* Toast */}
       {toast && <div className={styles.toast}>{toast}</div>}
 
-      {/* Плавающие иконки соцсетей справа */}
+      {/* Плавающий виджет соцсетей СЛЕВА */}
       <div className={styles.socialFloat}>
-        <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Telegram">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/>
-          </svg>
-        </a>
-        <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="ВКонтакте">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12.785 16.241s.288-.032.436-.194c.136-.148.132-.427.132-.427s-.02-1.304.587-1.496c.597-.19 1.363 1.26 2.176 1.815.614.42 1.08.328 1.08.328l2.17-.03s1.135-.07.597-1.21c-.044-.073-.312-.657-1.603-1.858-1.35-1.256-1.17-1.053.457-3.228.99-1.32 1.386-2.127 1.262-2.472-.118-.33-.845-.243-.845-.243l-2.44.015s-.181-.025-.315.056c-.132.08-.216.267-.216.267s-.384 1.024-.895 1.895c-1.08 1.832-1.51 1.93-1.686 1.816-.41-.264-.307-1.066-.307-1.634 0-1.776.27-2.516-.524-2.713-.264-.063-.457-.105-1.13-.112-.865-.009-1.596.003-2.01.206-.275.134-.487.433-.358.45.16.021.522.098.715.36.248.34.24 1.1.24 1.1s.143 2.09-.333 2.348c-.327.176-.775-.183-1.736-1.827-.493-.854-.866-1.8-.866-1.8s-.072-.18-.202-.277c-.157-.117-.376-.154-.376-.154l-2.32.015s-.348.01-.476.161c-.114.135-.01.414-.01.414s1.817 4.25 3.872 6.395c1.886 1.97 4.028 1.842 4.028 1.842h.97z"/>
-          </svg>
-        </a>
-        <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Instagram">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
-          </svg>
-        </a>
-        <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.sfBtn} title="WhatsApp">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/>
-          </svg>
-        </a>
+        <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Telegram"><TgIcon /></a>
+        <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="ВКонтакте"><VkIcon /></a>
+        <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Instagram"><InstaIcon /></a>
+        <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.sfBtn} title="WhatsApp"><WaIcon /></a>
       </div>
 
       <div className={styles.announce}>
@@ -144,51 +133,41 @@ export default function Home({ initialProducts, settings }) {
       {/* ── ШАПКА ── */}
       <header className={styles.header}>
         <div className={styles.hTop}>
-          <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
-            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/>
-            </svg>
-          </button>
+          {/* ЛЕВАЯ ЧАСТЬ: мобильное меню + соцсети */}
+          <div className={styles.hLeft}>
+            <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/>
+              </svg>
+            </button>
+            <div className={styles.hSocials}>
+              <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="Telegram"><TgIcon /></a>
+              <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="ВКонтакте"><VkIcon /></a>
+              <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="Instagram"><InstaIcon /></a>
+              <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="WhatsApp"><WaIcon /></a>
+            </div>
+          </div>
 
+          {/* ЦЕНТР: логотип */}
           <a href="/" className={styles.logo}>
             <span className={styles.logoMain}>Bellissimo</span>
             <span className={styles.logoSub}>Lingerie</span>
           </a>
 
+          {/* ПРАВАЯ ЧАСТЬ: поиск + размерная сетка + корзина */}
           <div className={styles.hActions}>
-            {/* Поиск */}
             <button className={styles.hBtn} onClick={() => setSearchOpen(s => !s)} title="Поиск">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-                <circle cx="10.5" cy="10.5" r="6.5"/>
-                <path d="m15.5 15.5 5 5" strokeLinecap="round"/>
+                <circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5" strokeLinecap="round"/>
               </svg>
             </button>
 
-            {/* Telegram */}
-            <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hBtn} title="Telegram">
+            <button className={styles.hBtn} onClick={() => setSizeChartOpen(true)} title="Размерная сетка">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-                <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M3 6h18M3 12h18M3 18h18M9 3v3M15 3v3M9 18v3M15 18v3" strokeLinecap="round"/>
               </svg>
-            </a>
+            </button>
 
-            {/* Instagram */}
-            <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hBtn} title="Instagram">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                <circle cx="12" cy="12" r="4"/>
-                <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
-              </svg>
-            </a>
-
-            {/* ВКонтакте */}
-            <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hBtn} title="ВКонтакте">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
-                <rect x="2" y="2" width="20" height="20" rx="4"/>
-                <path d="M7 9c0 4 2.5 6.5 6 6.5h.5v-2.5c0 0 2 .2 3 2.5 0 0-1-4-3-4.5 1.5-.5 2.5-2 2.5-2H14s-.5 1.5-2 2V9" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
-
-            {/* Корзина */}
             <button className={styles.cartBtn} onClick={() => setCartOpen(true)} title="Корзина">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="20" height="20">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" strokeLinecap="round" strokeLinejoin="round"/>
@@ -210,14 +189,16 @@ export default function Home({ initialProducts, settings }) {
               <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Поиск по товарам..." className={styles.searchInput} />
               {searchQuery && <button onClick={() => setSearchQuery('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:18}}>×</button>}
-              <button onClick={() => { setSearchOpen(false); setSearchQuery('') }} style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:13,whiteSpace:'nowrap'}}>Закрыть</button>
+              <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+                style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:13,whiteSpace:'nowrap'}}>Закрыть</button>
             </div>
             {searchQuery.length > 1 && (
               <div className={styles.searchResults}>
                 {searchResults.length === 0 ? (
                   <div style={{padding:'16px 20px',color:'var(--muted)',fontSize:14}}>Ничего не найдено</div>
                 ) : searchResults.map(p => (
-                  <div key={p.id} className={styles.searchItem} onClick={() => { openLightbox(p); setSearchOpen(false); setSearchQuery('') }}>
+                  <div key={p.id} className={styles.searchItem}
+                    onClick={() => { openLightbox(p); setSearchOpen(false); setSearchQuery('') }}>
                     {p.images?.[0] && <img src={p.images[0]} alt={p.name} />}
                     <div>
                       <div style={{fontSize:14,fontFamily:'Georgia,serif',color:'var(--text)'}}>{p.name}</div>
@@ -245,7 +226,8 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.mobileMenu}>
           <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
           {categories.map(cat => (
-            <button key={cat} className={styles.mobileLink} onClick={() => { selectCategory(cat); setMenuOpen(false) }}>{cat}</button>
+            <button key={cat} className={styles.mobileLink}
+              onClick={() => { selectCategory(cat); setMenuOpen(false) }}>{cat}</button>
           ))}
           <div style={{marginTop:'auto',paddingTop:24,borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:10}}>
             <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer"
@@ -276,7 +258,7 @@ export default function Home({ initialProducts, settings }) {
         </div>
       </section>
 
-      {/* Shipping bar — БЕЗ inline margin */}
+      {/* Shipping bar */}
       <div className={styles.shippingBar}>
         <p>🚚 Заказы от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> — бесплатно</p>
         <div className={styles.shipDiv}/>
@@ -284,7 +266,8 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.shipDiv}/>
         <p>📦 По всей <strong>России</strong></p>
         <div className={styles.shipDiv}/>
-        <button onClick={() => setSizeChartOpen(true)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontWeight:600,fontSize:13,fontFamily:'var(--sans)'}}>
+        <button onClick={() => setSizeChartOpen(true)}
+          style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontWeight:600,fontSize:13,fontFamily:'var(--sans)'}}>
           📏 Размерная сетка
         </button>
       </div>
@@ -296,19 +279,14 @@ export default function Home({ initialProducts, settings }) {
           <p>{filtered.length} {filtered.length===1?'товар':filtered.length<5?'товара':'товаров'}</p>
           <div className={styles.dot}/>
         </div>
-
         <div className={styles.catFilter}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
               className={`${styles.catBtn} ${activeCategory===cat?styles.catBtnActive:''}`}>{cat}</button>
           ))}
         </div>
-
         {filtered.length === 0 ? (
-          <div className={styles.empty}>
-            <div className={styles.emptyIcon}>🛍️</div>
-            <p>В этой категории пока нет товаров</p>
-          </div>
+          <div className={styles.empty}><div className={styles.emptyIcon}>🛍️</div><p>В этой категории пока нет товаров</p></div>
         ) : (
           <div className={styles.prodGrid}>
             {filtered.map(product => (
@@ -326,9 +304,7 @@ export default function Home({ initialProducts, settings }) {
           <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Любой населённый пункт страны.</p><div className={styles.cost}>от 250 ₽ · 5–10 дней</div></div>
           <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>от 350 ₽ · 1 день</div></div>
         </div>
-        <div className={styles.delNote}>
-          💳 Оплата картой <strong>МИР</strong> после подтверждения · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong>
-        </div>
+        <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> после подтверждения · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
       </section>
 
       {/* Преимущества */}
@@ -344,13 +320,8 @@ export default function Home({ initialProducts, settings }) {
       {/* WhatsApp баннер */}
       <section className={styles.waBanner}>
         <div className={styles.waInner}>
-          <div>
-            <h3>Нужна помощь с выбором?</h3>
-            <p>Наш менеджер поможет подобрать размер, цвет и комплект. Ответим за 5 минут!</p>
-          </div>
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.waBtn}>
-            💬 Написать в WhatsApp
-          </a>
+          <div><h3>Нужна помощь с выбором?</h3><p>Наш менеджер поможет подобрать размер, цвет и комплект. Ответим за 5 минут!</p></div>
+          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.waBtn}>💬 Написать в WhatsApp</a>
         </div>
       </section>
 
@@ -359,22 +330,10 @@ export default function Home({ initialProducts, settings }) {
         <h3>Мы в социальных сетях</h3>
         <p>Следите за новинками и акциями</p>
         <div className={styles.socialIcons}>
-          <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socTg}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-            Telegram
-          </a>
-          <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socVk}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12.785 16.241s.288-.032.436-.194c.136-.148.132-.427.132-.427s-.02-1.304.587-1.496c.597-.19 1.363 1.26 2.176 1.815.614.42 1.08.328 1.08.328l2.17-.03s1.135-.07.597-1.21c-.044-.073-.312-.657-1.603-1.858-1.35-1.256-1.17-1.053.457-3.228.99-1.32 1.386-2.127 1.262-2.472-.118-.33-.845-.243-.845-.243l-2.44.015s-.181-.025-.315.056c-.132.08-.216.267-.216.267s-.384 1.024-.895 1.895c-1.08 1.832-1.51 1.93-1.686 1.816-.41-.264-.307-1.066-.307-1.634 0-1.776.27-2.516-.524-2.713-.264-.063-.457-.105-1.13-.112-.865-.009-1.596.003-2.01.206-.275.134-.487.433-.358.45.16.021.522.098.715.36.248.34.24 1.1.24 1.1s.143 2.09-.333 2.348c-.327.176-.775-.183-1.736-1.827-.493-.854-.866-1.8-.866-1.8s-.072-.18-.202-.277c-.157-.117-.376-.154-.376-.154l-2.32.015s-.348.01-.476.161c-.114.135-.01.414-.01.414s1.817 4.25 3.872 6.395c1.886 1.97 4.028 1.842 4.028 1.842h.97z"/></svg>
-            ВКонтакте
-          </a>
-          <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socInst}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-            Instagram
-          </a>
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socWa}`}>
-            <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/></svg>
-            WhatsApp
-          </a>
+          <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socTg}`}><TgIcon />Telegram</a>
+          <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socVk}`}><VkIcon />ВКонтакте</a>
+          <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socInst}`}><InstaIcon />Instagram</a>
+          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socWa}`}><WaIcon />WhatsApp</a>
         </div>
       </section>
 
@@ -391,20 +350,12 @@ export default function Home({ initialProducts, settings }) {
           <div className={styles.fBrand}>
             <span className={styles.fLm}>Bellissimo</span>
             <span className={styles.fLs}>Lingerie</span>
-            <p>Интернет-магазин будуарного нижнего белья. Изысканные комплекты, корсеты, пижамы. Доставка по всей России.</p>
+            <p>Интернет-магазин будуарного нижнего белья. Доставка по всей России.</p>
             <div className={styles.fSocials}>
-              <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" title="Telegram">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-              </a>
-              <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" title="ВКонтакте">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12.785 16.241s.288-.032.436-.194c.136-.148.132-.427.132-.427s-.02-1.304.587-1.496c.597-.19 1.363 1.26 2.176 1.815.614.42 1.08.328 1.08.328l2.17-.03s1.135-.07.597-1.21c-.044-.073-.312-.657-1.603-1.858-1.35-1.256-1.17-1.053.457-3.228.99-1.32 1.386-2.127 1.262-2.472-.118-.33-.845-.243-.845-.243l-2.44.015s-.181-.025-.315.056c-.132.08-.216.267-.216.267s-.384 1.024-.895 1.895c-1.08 1.832-1.51 1.93-1.686 1.816-.41-.264-.307-1.066-.307-1.634 0-1.776.27-2.516-.524-2.713-.264-.063-.457-.105-1.13-.112-.865-.009-1.596.003-2.01.206-.275.134-.487.433-.358.45.16.021.522.098.715.36.248.34.24 1.1.24 1.1s.143 2.09-.333 2.348c-.327.176-.775-.183-1.736-1.827-.493-.854-.866-1.8-.866-1.8s-.072-.18-.202-.277c-.157-.117-.376-.154-.376-.154l-2.32.015s-.348.01-.476.161c-.114.135-.01.414-.01.414s1.817 4.25 3.872 6.395c1.886 1.97 4.028 1.842 4.028 1.842h.97z"/></svg>
-              </a>
-              <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" title="Instagram">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-              </a>
-              <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" title="WhatsApp">
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/></svg>
-              </a>
+              <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" title="Telegram"><TgIcon /></a>
+              <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" title="ВКонтакте"><VkIcon /></a>
+              <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" title="Instagram"><InstaIcon /></a>
+              <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" title="WhatsApp"><WaIcon /></a>
             </div>
           </div>
           <div>
@@ -437,7 +388,7 @@ export default function Home({ initialProducts, settings }) {
         </div>
       </footer>
 
-      {/* ── КОРЗИНА ── */}
+      {/* КОРЗИНА */}
       {cartOpen && <div className={styles.cartOverlay} onClick={() => setCartOpen(false)} />}
       <div className={`${styles.cartSidebar} ${cartOpen ? styles.open : ''}`}>
         <div className={styles.cartHeader}>
@@ -464,7 +415,7 @@ export default function Home({ initialProducts, settings }) {
                         <span style={{width:28,textAlign:'center',fontSize:13,fontWeight:600}}>{item.qty}</span>
                         <button onClick={() => changeQty(item.key,+1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>+</button>
                       </div>
-                      <div className={styles.cartItemPrice}>{(item.price * item.qty).toLocaleString('ru')} ₽</div>
+                      <div className={styles.cartItemPrice}>{(item.price*item.qty).toLocaleString('ru')} ₽</div>
                     </div>
                   </div>
                   <button className={styles.cartRemove} onClick={() => removeFromCart(item.key)}>×</button>
@@ -492,7 +443,7 @@ export default function Home({ initialProducts, settings }) {
         )}
       </div>
 
-      {/* ── ОФОРМЛЕНИЕ ЗАКАЗА ── */}
+      {/* ОФОРМЛЕНИЕ ЗАКАЗА */}
       {checkoutOpen && (
         <div className={styles.modalOverlay} onClick={() => setCheckoutOpen(false)}>
           <div className={styles.modalBox} onClick={e=>e.stopPropagation()}>
@@ -501,23 +452,23 @@ export default function Home({ initialProducts, settings }) {
               <div style={{textAlign:'center',padding:'32px 0'}}>
                 <div style={{fontSize:64,marginBottom:16}}>✅</div>
                 <h3 style={{fontFamily:'Georgia,serif',fontSize:24,fontWeight:300,marginBottom:8}}>Заказ отправлен!</h3>
-                <p style={{color:'var(--muted)',fontSize:14}}>Менеджер свяжется с вами в WhatsApp в течение 5 минут</p>
+                <p style={{color:'var(--muted)',fontSize:14}}>Менеджер свяжется в WhatsApp в течение 5 минут</p>
               </div>
             ) : (
               <>
                 <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Оформление заказа</h3>
                 <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму — мы свяжемся через WhatsApp</p>
                 <form onSubmit={submitOrder} style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {[['name','Ваше имя *','Анна','text'],['phone','Телефон *','+7 (___) ___-__-__','tel'],['address','Город и адрес *','Москва, ул. Примерная, д. 1','text']].map(([field,label,ph,type]) => (
-                    <div key={field}>
-                      <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>{label}</label>
-                      <input type={type} required value={orderForm[field]} onChange={e=>setOrderForm(f=>({...f,[field]:e.target.value}))} placeholder={ph}
+                  {[['name','Ваше имя *','Анна','text'],['phone','Телефон *','+7 (___) ___-__-__','tel'],['address','Город и адрес *','Москва, ул. Примерная, д. 1','text']].map(([f,l,p,t]) => (
+                    <div key={f}>
+                      <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>{l}</label>
+                      <input type={t} required value={orderForm[f]} onChange={e=>setOrderForm(v=>({...v,[f]:e.target.value}))} placeholder={p}
                         style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box'}} />
                     </div>
                   ))}
                   <div>
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Комментарий</label>
-                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(f=>({...f,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
+                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
                       style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
                   </div>
                   <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:13}}>
@@ -533,14 +484,14 @@ export default function Home({ initialProducts, settings }) {
         </div>
       )}
 
-      {/* ── РАЗМЕРНАЯ СЕТКА ── */}
+      {/* РАЗМЕРНАЯ СЕТКА */}
       {sizeChartOpen && (
         <div className={styles.modalOverlay} style={{zIndex:600}} onClick={() => setSizeChartOpen(false)}>
           <div className={styles.modalBox} style={{maxWidth:620}} onClick={e=>e.stopPropagation()}>
             <button onClick={() => setSizeChartOpen(false)} className={styles.modalClose}>✕</button>
             <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Размерная сетка</h3>
             <p style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>Все размеры для российских стандартов</p>
-            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10,color:'var(--text)'}}>Одежда (пижамы, халаты, сорочки)</h4>
+            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Одежда (пижамы, халаты, сорочки)</h4>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:24}}>
               <thead><tr style={{background:'var(--bg2)'}}>
                 {['Размер','Грудь','Талия','Бёдра'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}
@@ -551,7 +502,7 @@ export default function Home({ initialProducts, settings }) {
                 ))}
               </tbody>
             </table>
-            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10,color:'var(--text)'}}>Бюстгальтеры</h4>
+            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Бюстгальтеры</h4>
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:20}}>
               <thead><tr style={{background:'var(--bg2)'}}>
                 {['Размер','Объём груди','Под грудью'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}
@@ -569,14 +520,15 @@ export default function Home({ initialProducts, settings }) {
         </div>
       )}
 
-      {/* ── ЛАЙТБОКС ── */}
+      {/* ЛАЙТБОКС */}
       {lightbox !== null && (
         <div className={styles.lbOverlay} onClick={closeLightbox}>
           <div className={styles.lbBox} onClick={e=>e.stopPropagation()}>
             <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
             <div className={styles.lbMain}>
               {lbTotal > 1 && <button className={styles.lbPrev} onClick={e=>{e.stopPropagation();prevMedia()}}>‹</button>}
-              {lbIsVideo ? <video src={lbUrl} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain',background:'#000'}} />
+              {lbIsVideo
+                ? <video src={lbUrl} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain',background:'#000'}} />
                 : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
             </div>
@@ -634,15 +586,32 @@ export default function Home({ initialProducts, settings }) {
 }
 
 function ProductCard({ product, onAddToCart, onOpen }) {
-  const [imgIdx, setImgIdx] = useState(0)
+  const [hovered, setHovered] = useState(false)
   const imgs = product.images || []
+  const mainImg = imgs[0] || ''
+  const hoverImg = imgs[1] || imgs[0] || ''
+
   return (
-    <div className={styles.prodCard} onClick={() => onOpen(product)}>
-      <div className={styles.prodImg} onMouseEnter={() => imgs.length>1&&setImgIdx(1)} onMouseLeave={() => setImgIdx(0)}>
-        {imgs[imgIdx] && <img src={imgs[imgIdx]} alt={product.name} loading="lazy" />}
+    <div className={styles.prodCard}>
+      <div
+        className={styles.prodImg}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={() => onOpen(product)}
+        style={{cursor:'pointer'}}
+      >
+        {mainImg && (
+          <img
+            src={hovered && hoverImg ? hoverImg : mainImg}
+            alt={product.name}
+            loading="lazy"
+          />
+        )}
         {product.is_new && <span className={styles.tagNew}>New</span>}
         {product.video_url && <span className={styles.tagVideo}>▶ видео</span>}
-        <button className={styles.addBar} onClick={e=>{e.stopPropagation();onOpen(product)}}>Выбрать размер →</button>
+        <div className={styles.addBar} onClick={e => { e.stopPropagation(); onOpen(product) }}>
+          Выбрать размер →
+        </div>
       </div>
       <div className={styles.prodBody}>
         <div className={styles.prodCat}>{product.category}</div>
@@ -651,7 +620,9 @@ function ProductCard({ product, onAddToCart, onOpen }) {
           <span className={styles.now}>{product.price?.toLocaleString('ru')} ₽</span>
           {product.old_price && <span className={styles.was}>{product.old_price.toLocaleString('ru')} ₽</span>}
         </div>
-        {product.sizes?.length > 0 && <div className={styles.prodSizes}>{product.sizes.map(s=><span key={s}>{s}</span>)}</div>}
+        {product.sizes?.length > 0 && (
+          <div className={styles.prodSizes}>{product.sizes.map(s=><span key={s}>{s}</span>)}</div>
+        )}
       </div>
     </div>
   )
