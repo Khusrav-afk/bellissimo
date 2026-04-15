@@ -19,6 +19,7 @@ export default function Home({ initialProducts, settings }) {
   const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
   const [orderSent, setOrderSent] = useState(false)
   const [lbQty, setLbQty] = useState(1)
+  const [wishlistOpen, setWishlistOpen] = useState(false)
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
   const categories = ['Все','Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки']
@@ -192,14 +193,12 @@ export default function Home({ initialProducts, settings }) {
                 <path d="M3 7h18M3 12h18M3 17h18M9 4v3M15 4v3M9 17v3M15 17v3" strokeLinecap="round"/>
               </svg>
             </button>
-            {wishlist.length > 0 && (
-              <button className={styles.hBtn} title="Избранное" style={{position:'relative'}}>
-                <svg viewBox="0 0 24 24" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1.5" width="19" height="19">
-                  <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
-                </svg>
-                <span className={styles.badge}>{wishlist.length}</span>
-              </button>
-            )}
+            <button className={styles.hBtn} onClick={() => setWishlistOpen(true)} title="Избранное" style={{position:'relative'}}>
+              <svg viewBox="0 0 24 24" fill={wishlist.length > 0 ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="1.8" width="19" height="19">
+                <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
+              </svg>
+              {wishlist.length > 0 && <span className={styles.badge}>{wishlist.length}</span>}
+            </button>
             <button className={styles.cartBtn} onClick={() => setCartOpen(true)} title="Корзина">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
                 <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" strokeLinecap="round" strokeLinejoin="round"/>
@@ -296,9 +295,7 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.shipDiv}/>
         <p>📦 По всей <strong>России</strong></p>
         <div className={styles.shipDiv}/>
-        <button onClick={() => setSizeChartOpen(true)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontWeight:600,fontSize:13,fontFamily:'var(--sans)'}}>
-          📏 Размерная сетка
-        </button>
+        <p>↩️ Обмен <strong>14 дней</strong></p>
       </div>
 
       {/* Каталог */}
@@ -671,6 +668,50 @@ export default function Home({ initialProducts, settings }) {
           </div>
         </div>
       )}
+
+      {/* ИЗБРАННОЕ */}
+      {wishlistOpen && <div className={styles.cartOverlay} onClick={() => setWishlistOpen(false)} />}
+      <div className={`${styles.cartSidebar} ${wishlistOpen ? styles.open : ''}`}>
+        <div className={styles.cartHeader}>
+          <h3>Избранное {wishlist.length > 0 && <span style={{fontSize:13,color:'var(--muted)',fontWeight:400}}>· {wishlist.length} шт</span>}</h3>
+          <button onClick={() => setWishlistOpen(false)}>✕</button>
+        </div>
+        <div className={styles.cartItems}>
+          {wishlist.length === 0 ? (
+            <div className={styles.cartEmpty}>
+              <div style={{fontSize:48,marginBottom:16}}>❤️</div>
+              <p>Избранное пусто</p>
+              <p style={{fontSize:12,color:'var(--muted)',marginTop:8}}>Нажмите ❤️ на товаре чтобы добавить</p>
+            </div>
+          ) : (
+            products.filter(p => wishlist.includes(p.id)).map(product => (
+              <div key={product.id} style={{display:'flex',gap:12,marginBottom:16,paddingBottom:16,borderBottom:'1px solid var(--border)'}}>
+                {product.images?.[0] && (
+                  <img src={product.images[0]} alt={product.name} style={{width:72,height:96,objectFit:'cover',objectPosition:'top',borderRadius:8,cursor:'pointer',flexShrink:0}}
+                    onClick={() => { openLightbox(product); setWishlistOpen(false) }} />
+                )}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontFamily:'Georgia,serif',fontSize:14,marginBottom:4,color:'var(--text)',cursor:'pointer',lineHeight:1.3}}
+                    onClick={() => { openLightbox(product); setWishlistOpen(false) }}>{product.name}</div>
+                  <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>{product.category}</div>
+                  <div style={{fontWeight:700,fontSize:15,color:'var(--accent-dark)',marginBottom:10}}>{product.price?.toLocaleString('ru')} ₽</div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={() => { addToCart(product, product.sizes?.[0]); setWishlistOpen(false) }}
+                      style={{flex:1,padding:'7px 12px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600}}>
+                      + В корзину
+                    </button>
+                    <button onClick={() => toggleWishlist(product.id)}
+                      style={{width:34,height:34,background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#c45c5c',fontSize:16}}>
+                      ×
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
     </>
   )
 }
