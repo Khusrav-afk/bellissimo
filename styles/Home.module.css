@@ -291,10 +291,10 @@ nav { background: var(--bg); border-bottom: 1px solid var(--border); }
 .sfBtn:hover { background: var(--accent); color: #fff; width: 52px; }
 
 /* ── Соцсети с цветными hover ── */
-.socTg:hover { background: #229ED9 !important; color: #fff !important; border-color: #229ED9 !important; }
-.socVk:hover { background: #0077FF !important; color: #fff !important; border-color: #0077FF !important; }
-.socInst:hover { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888) !important; color: #fff !important; border-color: #e1306c !important; }
-.socWa:hover { background: #25d366 !important; color: #fff !important; border-color: #25d366 !important; }
+.socTg:hover { background: #229ED9; color: #fff; border-color: #229ED9; }
+.socVk:hover { background: #0077FF; color: #fff; border-color: #0077FF; }
+.socInst:hover { background: #e1306c; color: #fff; border-color: #e1306c; }
+.socWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
 /* ── Иконки соцсетей в футере ── */
 .fSocials { display: flex; gap: 10px; margin-top: 16px; }
