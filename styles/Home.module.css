@@ -1,6 +1,5 @@
 /* Переменные — в globals.css */
 
-/* ── Объявление ── */
 .announce { background: var(--accent); color: #fff; text-align: center; padding: 10px 16px; font-size: 13px; letter-spacing: .5px; }
 .announce strong { font-weight: 600; }
 
@@ -8,27 +7,22 @@
 .header { background: rgba(253,249,246,.96); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(12px); }
 .hTop { max-width: 1320px; margin: 0 auto; padding: 14px 40px; display: flex; align-items: center; justify-content: space-between; }
 
-/* Левая часть шапки: соцсети */
-.hLeft { display: flex; align-items: center; gap: 8px; }
-.hSocials { display: flex; gap: 2px; }
-.hSocBtn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: none; color: var(--muted); text-decoration: none; transition: background .2s, color .2s; }
+.hLeft { display: flex; align-items: center; gap: 12px; }
+.hSocials { display: flex; gap: 6px; }
+.hSocBtn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: none; color: var(--muted); text-decoration: none; transition: background .2s, color .2s; }
 .hSocBtn:hover { background: var(--bg2); color: var(--accent); }
 
-/* Логотип */
 .logo { font-family: var(--serif); text-decoration: none; display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
 .logoMain { font-style: italic; color: var(--accent); font-size: 28px; letter-spacing: 3px; }
 .logoSub { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); font-family: var(--sans); font-weight: 300; }
 
-/* Правая часть: иконки действий */
-.hActions { display: flex; gap: 2px; align-items: center; }
-.hBtn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; }
+.hActions { display: flex; gap: 4px; align-items: center; }
+.hBtn { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; }
 .hBtn:hover { background: var(--bg2); color: var(--accent); }
-.cartBtn { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; position: relative; }
+.cartBtn { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; background: none; border: none; cursor: pointer; color: var(--text); transition: background .2s, color .2s; position: relative; }
 .cartBtn:hover { background: var(--bg2); color: var(--accent); }
-.badge { position: absolute; top: 4px; right: 4px; background: var(--accent); color: #fff; font-size: 9px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-
-/* Мобильная кнопка */
-.mobileToggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; }
+.badge { position: absolute; top: 2px; right: 2px; background: var(--accent); color: #fff; font-size: 9px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.mobileToggle { display: none; background: none; border: none; cursor: pointer; color: var(--text); width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 10px; }
 
 /* ── Поиск ── */
 .searchBar { border-top: 1px solid var(--border); background: var(--bg); }
@@ -80,20 +74,25 @@
 .sHeader p { color: var(--muted); font-size: 14px; font-weight: 300; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin: 12px auto 0; }
 
-/* ── Фильтр категорий ── */
+/* ── Фильтры ── */
 .catFilter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; justify-content: center; }
 .catBtn { padding: 7px 16px; border: 1.5px solid var(--border); border-radius: 20px; background: #fff; color: var(--muted); font-size: 12px; cursor: pointer; transition: all .2s; font-family: var(--sans); }
 .catBtn:hover { border-color: var(--accent); color: var(--accent); }
 .catBtnActive { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 
-/* ── Карточки товаров ── */
+/* ── Карточки ── */
 .prodGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.prodCard { background: var(--card); border-radius: var(--radius); overflow: hidden; }
+.prodCard { background: var(--card); border-radius: var(--radius); overflow: hidden; transition: transform .3s, box-shadow .3s; }
+.prodCard:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(58,47,43,.08); }
 .prodImg { aspect-ratio: 3/4; position: relative; overflow: hidden; background: var(--bg2); cursor: pointer; }
 .prodImg img { width: 100%; height: 100%; object-fit: cover; object-position: top center; transition: transform .5s; display: block; }
 .prodImg:hover img { transform: scale(1.05); }
-.tagNew { position: absolute; top: 12px; left: 12px; padding: 4px 12px; border-radius: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 600; z-index: 2; background: var(--accent); color: #fff; pointer-events: none; }
-.tagVideo { position: absolute; bottom: 52px; left: 12px; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: 600; z-index: 2; background: rgba(58,47,43,.75); color: #fff; pointer-events: none; }
+.prodBadges { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 2; pointer-events: none; }
+.tagNew { padding: 3px 10px; border-radius: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; background: var(--accent); color: #fff; display: inline-block; }
+.tagSale { padding: 3px 10px; border-radius: 6px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; background: #c45c5c; color: #fff; display: inline-block; }
+.tagVideo { padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(58,47,43,.75); color: #fff; display: inline-block; }
+.wishBtn { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.9); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 3; transition: all .2s; opacity: 0; }
+.prodImg:hover .wishBtn { opacity: 1; }
 .addBar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(58,47,43,.88); color: #fff; padding: 12px; text-align: center; font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; transform: translateY(100%); transition: transform .35s; cursor: pointer; font-weight: 600; z-index: 3; border: none; font-family: var(--sans); width: 100%; }
 .prodImg:hover .addBar { transform: translateY(0); }
 .prodBody { padding: 16px 14px 18px; }
@@ -106,7 +105,6 @@
 .prodSizes span { min-width: 28px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 5px; font-size: 10px; color: var(--muted); cursor: pointer; padding: 0 5px; transition: all .2s; }
 .prodSizes span:hover { border-color: var(--accent); color: var(--accent); }
 
-/* ── Пустой каталог ── */
 .empty { text-align: center; padding: 80px 20px; color: var(--muted); }
 .emptyIcon { font-size: 48px; margin-bottom: 16px; }
 
@@ -129,7 +127,7 @@
 .trustItem h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
 .trustItem p { font-size: 12px; color: var(--muted); font-weight: 300; line-height: 1.5; }
 
-/* ── WhatsApp баннер ── */
+/* ── WhatsApp ── */
 .waBanner { background: linear-gradient(135deg, #1a3a2a, #0d2b1f); padding: 48px 40px; }
 .waInner { max-width: 1320px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .waBanner h3 { font-family: var(--serif); font-size: 26px; font-weight: 300; color: #fff; margin-bottom: 8px; }
@@ -148,12 +146,12 @@
 .socInst:hover { background: #e1306c; color: #fff; border-color: #e1306c; }
 .socWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
-/* ── Плавающий виджет соцсетей СЛЕВА ── */
+/* ── Плавающий виджет СЛЕВА ── */
 .socialFloat { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; }
-.sfBtn { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--card); color: var(--muted); text-decoration: none; border-right: 3px solid var(--accent); transition: all .25s; box-shadow: 2px 0 16px rgba(0,0,0,.1); }
-.sfBtn:first-child { border-radius: 0 8px 0 0; }
-.sfBtn:last-child { border-radius: 0 0 8px 0; }
-.sfBtn:hover { background: var(--accent); color: #fff; width: 58px; border-right-color: var(--accent-dark); }
+.sfBtn { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; background: var(--card); color: var(--muted); text-decoration: none; border-right: 3px solid var(--accent-light); transition: all .25s; box-shadow: 2px 0 12px rgba(0,0,0,.08); }
+.sfBtn:first-child { border-radius: 0 10px 0 0; }
+.sfBtn:last-child { border-radius: 0 0 10px 0; }
+.sfBtn:hover { background: var(--accent); color: #fff; width: 56px; border-right-color: var(--accent-dark); }
 
 /* ── Футер соцсети ── */
 .fSocials { display: flex; gap: 10px; margin-top: 16px; }
@@ -213,32 +211,40 @@
 
 /* ── Лайтбокс ── */
 .lbOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.lbBox { background: #fff; border-radius: 20px; max-width: 1160px; width: 100%; height: 90vh; display: grid; grid-template-columns: 1fr 320px; grid-template-rows: 1fr auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; }
+.lbBox { background: #fff; border-radius: 20px; max-width: 1160px; width: 100%; height: 90vh; display: grid; grid-template-columns: 1fr 340px; grid-template-rows: 1fr auto; position: relative; box-shadow: 0 32px 80px rgba(0,0,0,.4); overflow: hidden; }
 .lbClose { position: absolute; top: 14px; right: 14px; background: rgba(0,0,0,.45); color: #fff; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; }
 .lbMain { position: relative; background: #f5f0ec; border-radius: 20px 0 0 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-.lbImg { width: 100%; height: 100%; object-fit: contain; object-position: center; }
+.lbImg { width: 100%; height: 100%; object-fit: contain; }
 .lbPrev,.lbNext { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.92); border: none; width: 44px; height: 44px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
 .lbPrev { left: 16px; }
 .lbNext { right: 16px; }
 .lbThumbs { display: flex; gap: 8px; padding: 10px 16px; background: #f5f0ec; border-radius: 0 0 0 20px; flex-wrap: wrap; align-items: center; }
-.lbThumb { width: 62px; height: 80px; border-radius: 8px; cursor: pointer; opacity: .5; transition: opacity .2s; border: 2.5px solid transparent; flex-shrink: 0; overflow: hidden; }
+.lbThumb { width: 60px; height: 78px; border-radius: 8px; cursor: pointer; opacity: .5; transition: opacity .2s; border: 2.5px solid transparent; flex-shrink: 0; overflow: hidden; }
 .lbThumbActive { opacity: 1; border-color: var(--accent); }
-.lbInfo { padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; grid-row: 1 / 3; overflow-y: auto; border-left: 1px solid var(--border); }
+
+/* Правая панель лайтбокса */
+.lbInfo { padding: 24px 22px; display: flex; flex-direction: column; gap: 16px; grid-row: 1 / 3; overflow-y: auto; border-left: 1px solid var(--border); }
 .lbCat { font-size: 10px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; font-weight: 700; }
-.lbName { font-family: var(--serif); font-size: 22px; font-weight: 400; line-height: 1.3; color: var(--text); }
-.lbPrices { display: flex; align-items: center; gap: 10px; }
+.lbName { font-family: var(--serif); font-size: 20px; font-weight: 400; line-height: 1.3; color: var(--text); }
+.lbPrices { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .lbPrice { font-size: 22px; font-weight: 700; color: var(--text); }
 .lbOld { font-size: 14px; color: var(--muted); text-decoration: line-through; }
 .lbDesc { font-size: 13px; color: var(--muted); line-height: 1.7; font-weight: 300; }
 .lbSizes { display: flex; flex-wrap: wrap; gap: 6px; }
-.lbSize { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--muted); cursor: pointer; transition: all .2s; }
+.lbSize { padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; transition: all .2s; font-family: var(--sans); }
 .lbSize:hover { border-color: var(--accent); color: var(--accent); }
 .lbSizeActive { border-color: var(--accent); color: var(--accent); background: #fdf3f5; font-weight: 700; }
-.lbAddBtn { padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; font-weight: 700; font-family: var(--sans); transition: background .3s; }
+.lbAddBtn { padding: 15px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; cursor: pointer; font-weight: 700; font-family: var(--sans); transition: background .3s; }
 .lbAddBtn:hover { background: var(--accent-dark); }
+.lbFacts { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg2); border-radius: 10px; }
+.lbFact { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.lbFact span:first-child { font-size: 16px; flex-shrink: 0; }
+.lbWa { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px; background: #f0faf3; color: #2d7a47; border-radius: 10px; font-size: 13px; text-decoration: none; font-weight: 600; border: 1px solid #c6e9d0; transition: all .2s; }
+.lbWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
 /* ── Toast ── */
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #3a2f2b; color: #fff; padding: 12px 24px; border-radius: 24px; font-size: 14px; z-index: 1000; box-shadow: 0 8px 32px rgba(0,0,0,.2); white-space: nowrap; animation: toastIn .3s ease; }
+.toastSuccess { background: var(--accent); }
 @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(16px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 
 /* ── Адаптив ── */
@@ -249,9 +255,9 @@
   .prodGrid { grid-template-columns: repeat(2, 1fr); }
   .trustGrid,.delCards { grid-template-columns: repeat(2, 1fr); }
   .fGrid { grid-template-columns: 1fr 1fr; }
-  .lbBox { grid-template-columns: 1fr; grid-template-rows: 60vh auto auto; height: auto; max-height: 95vh; overflow-y: auto; }
+  .lbBox { grid-template-columns: 1fr; grid-template-rows: 55vh auto auto; height: auto; max-height: 95vh; overflow-y: auto; }
   .lbInfo { grid-row: auto; border-left: none; border-top: 1px solid var(--border); }
-  .lbMain { border-radius: 20px 20px 0 0; min-height: 60vh; }
+  .lbMain { border-radius: 20px 20px 0 0; min-height: 55vh; }
   .lbThumbs { border-radius: 0; }
 }
 @media (max-width: 768px) {
