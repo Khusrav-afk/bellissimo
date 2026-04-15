@@ -282,3 +282,25 @@ nav { background: var(--bg); border-bottom: 1px solid var(--border); }
   .lbName { font-size: 18px; }
   .lbPrice { font-size: 18px; }
 }
+
+/* ── Плавающие иконки соцсетей (справа) ── */
+.socialFloat { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; gap: 0; }
+.sfBtn { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: #fff; color: var(--text); text-decoration: none; border-right: none; border-left: 3px solid var(--accent); transition: all .25s; box-shadow: -2px 0 12px rgba(0,0,0,.08); }
+.sfBtn:first-child { border-radius: 8px 0 0 0; }
+.sfBtn:last-child { border-radius: 0 0 0 8px; }
+.sfBtn:hover { background: var(--accent); color: #fff; width: 52px; }
+
+/* ── Соцсети с цветными hover ── */
+.socTg:hover { background: #229ED9 !important; color: #fff !important; border-color: #229ED9 !important; }
+.socVk:hover { background: #0077FF !important; color: #fff !important; border-color: #0077FF !important; }
+.socInst:hover { background: linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888) !important; color: #fff !important; border-color: #e1306c !important; }
+.socWa:hover { background: #25d366 !important; color: #fff !important; border-color: #25d366 !important; }
+
+/* ── Иконки соцсетей в футере ── */
+.fSocials { display: flex; gap: 10px; margin-top: 16px; }
+.fSocials a { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.5); display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all .25s; }
+.fSocials a:hover { background: var(--accent); color: #fff; }
+
+@media (max-width: 768px) {
+  .socialFloat { display: none; }
+}
