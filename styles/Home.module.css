@@ -147,11 +147,11 @@
 .socWa:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
 /* ── Плавающий виджет СЛЕВА ── */
-.socialFloat { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; }
-.sfBtn { display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; background: var(--card); color: var(--muted); text-decoration: none; border-right: 3px solid var(--accent-light); transition: all .25s; box-shadow: 2px 0 12px rgba(0,0,0,.08); }
-.sfBtn:first-child { border-radius: 0 10px 0 0; }
-.sfBtn:last-child { border-radius: 0 0 10px 0; }
-.sfBtn:hover { background: var(--accent); color: #fff; width: 56px; border-right-color: var(--accent-dark); }
+.socialFloat { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 90; display: flex; flex-direction: column; }
+.sfBtn { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; background: var(--card); color: var(--muted); text-decoration: none; border-left: 3px solid var(--accent-light); transition: all .25s; box-shadow: -2px 0 12px rgba(0,0,0,.08); }
+.sfBtn:first-child { border-radius: 10px 0 0 0; }
+.sfBtn:last-child { border-radius: 0 0 0 10px; }
+.sfBtn:hover { background: var(--accent); color: #fff; width: 64px; border-left-color: var(--accent-dark); }
 
 /* ── Футер соцсети ── */
 .fSocials { display: flex; gap: 10px; margin-top: 16px; }
