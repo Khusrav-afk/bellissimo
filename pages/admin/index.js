@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'bellissimo2025'
-const CATEGORIES = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки']
+const CATEGORIES = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки', 'Пояса для чулок', 'Купальники']
 const BUCKET = 'product'
 
 export default function Admin() {
@@ -17,23 +17,29 @@ export default function Admin() {
   const [msg, setMsg] = useState({ text: '', type: '' })
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('Все')
-  const [dragOver, setDragOver] = useState(false)
   const [dragIdx, setDragIdx] = useState(null)
-  const fileInputRef = useRef()
-  const [settings, setSettings] = useState({ hero_title: 'Красота, которая ближе к телу', hero_subtitle: 'Будуарное нижнее бельё для особых моментов', hero_image: '', free_delivery_amount: 10000 })
+  const [settings, setSettings] = useState({ 
+    hero_title: '', hero_subtitle: '', hero_image: '', free_delivery_amount: 10000,
+    delivery_cdek: 'от 290 ₽ · 2–5 дней',
+    delivery_post: 'от 250 ₽ · 5–10 дней',
+    delivery_courier: 'от 350 ₽ · 1 день',
+    return_policy: 'Нижнее бельё не подлежит обмену и возврату по санитарным нормам'
+  })
   const [settingsLoading, setSL] = useState(false)
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: '', category: 'Комплекты', price: '', old_price: '',
-    description: '', sizes: '', is_new: false, active: true,
+    description: '', sizes: '', sizeStock: {}, is_new: false, active: true,
     images: [], video_url: ''
-  })
+  }
+  const [form, setForm] = useState(emptyForm)
 
   useEffect(() => { if (auth) { loadProducts(); loadSettings() } }, [auth])
 
   async function loadProducts() {
     setLoading(true)
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    if (error) showMsg('Ошибка загрузки: ' + error.message, 'error')
     setProducts(data || [])
     setLoading(false)
   }
@@ -42,21 +48,24 @@ export default function Admin() {
     try {
       const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
       if (data) setSettings(data)
-    } catch(e) {}
+    } catch {}
   }
 
   async function saveSettings() {
     setSL(true)
-    await supabase.from('settings').upsert({ id: 1, ...settings })
+    const { error } = await supabase.from('settings').upsert({ id: 1, ...settings })
     setSL(false)
-    showMsg('✅ Настройки сохранены!')
+    if (error) showMsg('Ошибка: ' + error.message, 'error')
+    else showMsg('✅ Настройки сохранены!')
   }
 
   async function uploadFile(file, folder) {
     const ext = file.name.split('.').pop().toLowerCase()
     const filename = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from(BUCKET).upload(filename, file, { cacheControl: '3600', upsert: false, contentType: file.type })
-    if (error) throw error
+    const { error } = await supabase.storage.from(BUCKET).upload(filename, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type
+    })
+    if (error) throw new Error(error.message)
     const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(filename)
     return publicUrl
   }
@@ -65,16 +74,18 @@ export default function Admin() {
     const arr = Array.from(files).slice(0, 5 - form.images.length)
     if (!arr.length) return
     setUploading(true)
-    const urls = []
     for (const file of arr) {
-      try { urls.push({ url: await uploadFile(file, 'images'), isMain: false }) }
-      catch(e) { showMsg('❌ Ошибка: ' + e.message, 'error') }
+      try {
+        const url = await uploadFile(file, 'images')
+        setForm(f => {
+          const imgs = [...f.images, { url, isMain: false }]
+          if (!imgs.some(i => i.isMain)) imgs[0].isMain = true
+          return { ...f, images: imgs }
+        })
+      } catch (e) {
+        showMsg('❌ Ошибка загрузки фото: ' + e.message, 'error')
+      }
     }
-    setForm(f => {
-      const imgs = [...f.images, ...urls]
-      if (imgs.length && !imgs.some(i => i.isMain)) imgs[0].isMain = true
-      return { ...f, images: imgs }
-    })
     setUploading(false)
   }
 
@@ -85,7 +96,9 @@ export default function Admin() {
       const url = await uploadFile(file, 'videos')
       setForm(f => ({ ...f, video_url: url }))
       showMsg('✅ Видео загружено!')
-    } catch(e) { showMsg('❌ ' + e.message, 'error') }
+    } catch (e) {
+      showMsg('❌ Ошибка видео: ' + e.message, 'error')
+    }
     setUploading(false)
   }
 
@@ -96,7 +109,9 @@ export default function Admin() {
       const url = await uploadFile(file, 'hero')
       setSettings(s => ({ ...s, hero_image: url }))
       showMsg('✅ Главное фото загружено!')
-    } catch(e) { showMsg('❌ ' + e.message, 'error') }
+    } catch (e) {
+      showMsg('❌ ' + e.message, 'error')
+    }
     setSL(false)
   }
 
@@ -125,76 +140,107 @@ export default function Admin() {
     setDragIdx(null)
   }
 
+  // Обновление количества по размеру
+  function updateSizeStock(size, value) {
+    setForm(f => ({ ...f, sizeStock: { ...f.sizeStock, [size]: value } }))
+  }
+
   async function saveProduct() {
-    if (!form.name || !form.price) return showMsg('❌ Заполни название и цену', 'error')
+    if (!form.name.trim()) return showMsg('❌ Введите название товара', 'error')
+    if (!form.price) return showMsg('❌ Введите цену', 'error')
+
     const sorted = [...form.images].sort((a, b) => b.isMain - a.isMain)
+    const parsedSizes = form.sizes.split(',').map(s => s.trim()).filter(Boolean)
+
     const payload = {
-      name: form.name.trim(), category: form.category,
+      name: form.name.trim(),
+      category: form.category,
       price: Number(form.price),
       old_price: form.old_price ? Number(form.old_price) : null,
       description: form.description.trim(),
-      sizes: form.sizes.split(',').map(s => s.trim()).filter(Boolean),
+      sizes: parsedSizes,
+      size_stock: form.sizeStock || {},
       images: sorted.map(i => i.url),
       video_url: form.video_url || null,
-      is_new: form.is_new, active: form.active
+      is_new: form.is_new,
+      active: form.active,
     }
+
     setLoading(true)
-    const fn = editProduct
-      ? supabase.from('products').update(payload).eq('id', editProduct.id)
-      : supabase.from('products').insert([payload])
-    const { error } = await fn
-    if (error) { showMsg('❌ ' + error.message, 'error'); setLoading(false); return }
-    showMsg(editProduct ? '✅ Товар обновлён!' : '✅ Товар добавлен!')
-    setLoading(false); resetForm(); loadProducts(); setTab('list')
+    try {
+      let error
+      if (editProduct) {
+        const r = await supabase.from('products').update(payload).eq('id', editProduct.id)
+        error = r.error
+      } else {
+        const r = await supabase.from('products').insert([payload])
+        error = r.error
+      }
+      if (error) throw new Error(error.message)
+      showMsg(editProduct ? '✅ Товар обновлён!' : '✅ Товар добавлен!')
+      resetForm()
+      await loadProducts()
+      setTab('list')
+    } catch (e) {
+      showMsg('❌ Ошибка сохранения: ' + e.message, 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function toggleActive(p) {
-    await supabase.from('products').update({ active: !p.active }).eq('id', p.id)
-    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: !x.active } : x))
+    const { error } = await supabase.from('products').update({ active: !p.active }).eq('id', p.id)
+    if (!error) setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: !x.active } : x))
   }
 
   async function deleteProduct(id) {
-    if (!confirm('Удалить товар?')) return
-    await supabase.from('products').delete().eq('id', id)
-    setProducts(prev => prev.filter(x => x.id !== id))
+    if (!confirm('Удалить товар? Это нельзя отменить.')) return
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (!error) setProducts(prev => prev.filter(x => x.id !== id))
     showMsg('🗑 Удалено')
   }
 
   async function duplicateProduct(p) {
     const { id, created_at, ...rest } = p
-    await supabase.from('products').insert([{ ...rest, name: rest.name + ' (копия)', active: false }])
-    loadProducts(); showMsg('✅ Продублировано')
+    const { error } = await supabase.from('products').insert([{ ...rest, name: rest.name + ' (копия)', active: false }])
+    if (!error) { await loadProducts(); showMsg('✅ Продублировано') }
   }
 
   function startEdit(p) {
     setEditProduct(p)
+    const sizes = p.sizes || []
+    const sizeStock = p.size_stock || {}
     setForm({
-      name: p.name || '', category: p.category || 'Комплекты',
+      name: p.name || '',
+      category: p.category || 'Комплекты',
       price: p.price ? String(p.price) : '',
       old_price: p.old_price ? String(p.old_price) : '',
       description: p.description || '',
-      sizes: (p.sizes || []).join(', '),
-      is_new: p.is_new || false, active: p.active !== false,
+      sizes: sizes.join(', '),
+      sizeStock,
+      is_new: p.is_new || false,
+      active: p.active !== false,
       images: (p.images || []).map((url, i) => ({ url, isMain: i === 0 })),
       video_url: p.video_url || ''
     })
-    setTab('add'); window.scrollTo(0, 0)
+    setTab('add')
+    window.scrollTo(0, 0)
   }
 
-  function resetForm() {
-    setEditProduct(null)
-    setForm({ name: '', category: 'Комплекты', price: '', old_price: '', description: '', sizes: '', is_new: false, active: true, images: [], video_url: '' })
-  }
+  function resetForm() { setEditProduct(null); setForm(emptyForm) }
 
   function showMsg(text, type = 'success') {
-    setMsg({ text, type }); setTimeout(() => setMsg({ text: '', type: '' }), 4000)
+    setMsg({ text, type })
+    setTimeout(() => setMsg({ text: '', type: '' }), 5000)
   }
 
   const filtered = products.filter(p =>
     (filterCat === 'Все' || p.category === filterCat) &&
     (!search || p.name?.toLowerCase().includes(search.toLowerCase()))
   )
-  const activeCount = products.filter(p => p.active).length
+
+  // Парсим размеры из поля для показа stock
+  const parsedSizesForStock = form.sizes.split(',').map(s => s.trim()).filter(Boolean)
 
   if (!auth) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', fontFamily:'sans-serif' }}>
@@ -221,6 +267,7 @@ export default function Admin() {
       <Head><title>Bellissimo Admin</title></Head>
       <div style={{ minHeight:'100vh', background:'#f8f4f1', fontFamily:"'Nunito Sans',sans-serif" }}>
 
+        {/* Шапка */}
         <div style={{ background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', color:'#fff', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', height:58, position:'sticky', top:0, zIndex:50, boxShadow:'0 2px 16px rgba(0,0,0,.2)', flexWrap:'wrap', gap:8 }}>
           <div style={{ fontFamily:'Georgia,serif', fontSize:18 }}>
             <span style={{ color:'#f0c8d2', fontStyle:'italic' }}>Bellissimo</span>
@@ -228,7 +275,7 @@ export default function Admin() {
             <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {[['list','📋 Товары',products.length],['add','➕ Добавить'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
+            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
               <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
                 style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400 }}>
                 {label}{count !== undefined ? ` (${count})` : ''}
@@ -239,32 +286,32 @@ export default function Admin() {
         </div>
 
         {msg.text && (
-          <div style={{ background:msg.type==='error'?'#fef2f2':'#edf7ed', color:msg.type==='error'?'#c45c5c':'#3a7a3a', padding:'10px 24px', textAlign:'center', fontWeight:600, fontSize:13 }}>
+          <div style={{ background:msg.type==='error'?'#fef2f2':'#edf7ed', color:msg.type==='error'?'#c45c5c':'#3a7a3a', padding:'10px 24px', textAlign:'center', fontWeight:600, fontSize:13, borderBottom:`2px solid ${msg.type==='error'?'#fca5a5':'#86efac'}` }}>
             {msg.text}
           </div>
         )}
 
-        <div style={{ maxWidth:1100, margin:'0 auto', padding:'24px 16px' }}>
+        <div style={{ maxWidth:1200, margin:'0 auto', padding:'24px 16px' }}>
 
+          {/* ── Список товаров ── */}
           {tab === 'list' && (
             <div>
+              {/* Статистика */}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
                 {[
                   ['Всего товаров', products.length, '🛍️', '#c9748a'],
-                  ['Активных', activeCount, '✅', '#3a7a3a'],
-                  ['Скрытых', products.length - activeCount, '🙈', '#9e8e85'],
+                  ['Активных', products.filter(p=>p.active).length, '✅', '#3a7a3a'],
+                  ['Скрытых', products.filter(p=>!p.active).length, '🙈', '#9e8e85'],
                   ['Категорий', new Set(products.map(p=>p.category)).size, '📂', '#7c6d9a'],
                 ].map(([label,val,icon,color],i) => (
                   <div key={i} style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', gap:10 }}>
                     <span style={{ fontSize:24 }}>{icon}</span>
-                    <div>
-                      <div style={{ fontSize:20, fontWeight:700, color }}>{val}</div>
-                      <div style={{ fontSize:11, color:'#9e8e85' }}>{label}</div>
-                    </div>
+                    <div><div style={{ fontSize:20, fontWeight:700, color }}>{val}</div><div style={{ fontSize:11, color:'#9e8e85' }}>{label}</div></div>
                   </div>
                 ))}
               </div>
 
+              {/* Поиск */}
               <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', marginBottom:14, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по названию..."
                   style={{ flex:1, minWidth:180, padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none' }} />
@@ -298,9 +345,10 @@ export default function Admin() {
                         <div style={{ fontSize:11, color:'#9e8e85', display:'flex', gap:10, flexWrap:'wrap' }}>
                           <span>{p.category}</span>
                           <span style={{ color:'#c9748a', fontWeight:600 }}>{p.price?.toLocaleString('ru')} ₽</span>
-                          {p.old_price && <span style={{ textDecoration:'line-through' }}>{p.old_price?.toLocaleString('ru')} ₽</span>}
-                          {p.sizes?.length > 0 && <span>{p.sizes.join(', ')}</span>}
-                          <span>{p.images?.length||0} фото</span>
+                          {p.sizes?.length > 0 && <span>Размеры: {p.sizes.join(', ')}</span>}
+                          {p.size_stock && Object.keys(p.size_stock).length > 0 && (
+                            <span>Остатки: {Object.entries(p.size_stock).map(([s,q])=>`${s}:${q}`).join(', ')}</span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
@@ -319,6 +367,7 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Форма добавления/редактирования ── */}
           {tab === 'add' && (
             <div style={{ maxWidth:780 }}>
               <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>
@@ -326,44 +375,35 @@ export default function Admin() {
               </h2>
               <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:24 }}>
 
+                {/* Фото */}
                 <div>
                   <ST>📷 Фотографии (до 5 штук)</ST>
-                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Перетащи для смены порядка · Нажми ★ чтобы сделать фото главным</p>
-                  <div onDragOver={e=>{e.preventDefault();setDragOver(true)}} onDragLeave={()=>setDragOver(false)}
-                    onDrop={e=>{e.preventDefault();setDragOver(false);handlePhotoUpload(e.dataTransfer.files)}}
-                    style={{ border:`2px dashed ${dragOver?'#c9748a':'#ede4dc'}`, borderRadius:12, padding:16, background:dragOver?'#fdf3f5':'#fafafa', transition:'all .2s', minHeight:120 }}>
-                    <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'flex-start' }}>
-                      {form.images.map((img, idx) => (
-                        <div key={idx} draggable onDragStart={()=>handleDragStart(idx)} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDropImg(e,idx)}
-                          style={{ position:'relative', width:90, height:120, borderRadius:10, overflow:'hidden', border:`2.5px solid ${img.isMain?'#c9748a':'#ede4dc'}`, cursor:'grab', background:'#f5f5f5', flexShrink:0 }}>
-                          <img src={img.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
-                          <div style={{ position:'absolute', top:3, left:3, background:'rgba(0,0,0,.5)', color:'#fff', fontSize:9, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>{idx+1}</div>
-                          <button onClick={()=>setMainImage(idx)} title="Сделать главным"
-                            style={{ position:'absolute', top:3, right:22, width:18, height:18, borderRadius:'50%', background:img.isMain?'#c9748a':'rgba(255,255,255,.8)', border:'none', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center', color:img.isMain?'#fff':'#c9748a' }}>
-                            ★
-                          </button>
-                          <button onClick={()=>removeImage(idx)}
-                            style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'rgba(0,0,0,.6)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>×</button>
-                          {img.isMain && <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(201,116,138,.9)', color:'#fff', fontSize:8, textAlign:'center', padding:'2px 0', letterSpacing:1, fontWeight:700 }}>ГЛАВНОЕ</div>}
-                        </div>
-                      ))}
-                      {form.images.length < 5 && (
-                        <label style={{ width:90, height:120, borderRadius:10, border:'2px dashed #ede4dc', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:uploading?'wait':'pointer', color:'#9e8e85', fontSize:11, gap:4, background:'#fafafa', flexShrink:0 }}>
-                          {uploading ? <><span style={{ fontSize:22 }}>⏳</span><span>Загрузка</span></> : <><span style={{ fontSize:28, lineHeight:1 }}>+</span><span>Добавить фото</span></>}
-                          <input type="file" accept="image/*" multiple ref={fileInputRef} onChange={e=>handlePhotoUpload(e.target.files)} disabled={uploading} style={{ display:'none' }} />
-                        </label>
-                      )}
-                      {form.images.length === 0 && !uploading && (
-                        <div style={{ color:'#c9c0bb', fontSize:13, display:'flex', alignItems:'center', gap:8 }}>
-                          📸 Перетащи фото сюда или нажми «+»
-                        </div>
-                      )}
-                    </div>
+                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Перетащи для смены порядка · ★ — сделать главным</p>
+                  <div style={{ display:'flex', gap:10, flexWrap:'wrap', padding:12, background:'#fafafa', borderRadius:12, border:'2px dashed #ede4dc', minHeight:60 }}>
+                    {form.images.map((img, idx) => (
+                      <div key={idx} draggable onDragStart={()=>handleDragStart(idx)} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDropImg(e,idx)}
+                        style={{ position:'relative', width:90, height:120, borderRadius:10, overflow:'hidden', border:`2.5px solid ${img.isMain?'#c9748a':'#ede4dc'}`, cursor:'grab', background:'#f5f5f5', flexShrink:0 }}>
+                        <img src={img.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+                        <div style={{ position:'absolute', top:3, left:3, background:'rgba(0,0,0,.5)', color:'#fff', fontSize:9, width:16, height:16, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>{idx+1}</div>
+                        <button onClick={()=>setMainImage(idx)} title="Главное"
+                          style={{ position:'absolute', top:3, right:22, width:18, height:18, borderRadius:'50%', background:img.isMain?'#c9748a':'rgba(255,255,255,.8)', border:'none', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center', color:img.isMain?'#fff':'#c9748a' }}>★</button>
+                        <button onClick={()=>removeImage(idx)}
+                          style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'rgba(0,0,0,.65)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1 }}>×</button>
+                        {img.isMain && <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(201,116,138,.9)', color:'#fff', fontSize:8, textAlign:'center', padding:'2px 0', letterSpacing:1, fontWeight:700 }}>ГЛАВНОЕ</div>}
+                      </div>
+                    ))}
+                    {form.images.length < 5 && (
+                      <label style={{ width:90, height:120, borderRadius:10, border:'2px dashed #ede4dc', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:uploading?'wait':'pointer', color:'#9e8e85', fontSize:11, gap:4, flexShrink:0 }}>
+                        {uploading ? <><span style={{ fontSize:22 }}>⏳</span><span>Загрузка...</span></> : <><span style={{ fontSize:28, lineHeight:1 }}>+</span><span>Фото</span></>}
+                        <input type="file" accept="image/*" multiple onChange={e=>handlePhotoUpload(e.target.files)} disabled={uploading} style={{ display:'none' }} />
+                      </label>
+                    )}
                   </div>
                 </div>
 
+                {/* Видео */}
                 <div>
-                  <ST>🎬 Видео товара (необязательно)</ST>
+                  <ST>🎬 Видео (необязательно)</ST>
                   {form.video_url ? (
                     <div style={{ display:'flex', alignItems:'center', gap:12, padding:12, background:'#faf3ed', borderRadius:10, border:'1px solid #ede4dc' }}>
                       <video src={form.video_url} style={{ width:80, height:55, objectFit:'cover', borderRadius:6 }} muted />
@@ -378,19 +418,20 @@ export default function Admin() {
                       <span style={{ fontSize:28 }}>🎥</span>
                       <div>
                         <p style={{ fontSize:13, fontWeight:600, color:'#3a2f2b' }}>{uploading ? '⏳ Загрузка...' : 'Загрузить видео'}</p>
-                        <p style={{ fontSize:11, color:'#9e8e85' }}>MP4, до 50 МБ. Автоматически воспроизводится в галерее.</p>
+                        <p style={{ fontSize:11, color:'#9e8e85' }}>MP4, до 50 МБ</p>
                       </div>
                       <input type="file" accept="video/*" onChange={e=>handleVideoUpload(e.target.files[0])} style={{ display:'none' }} />
                     </label>
                   )}
                 </div>
 
+                {/* Основная информация */}
                 <div>
                   <ST>📝 Основная информация</ST>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                     <div style={{ gridColumn:'1/-1' }}>
                       <LB>Название товара *</LB>
-                      <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Например: Белый кружевной корсет" style={IS} />
+                      <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Белый кружевной корсет" style={IS} />
                     </div>
                     <div>
                       <LB>Категория *</LB>
@@ -411,7 +452,7 @@ export default function Admin() {
                       <input value={form.sizes} onChange={e=>setForm(f=>({...f,sizes:e.target.value}))} placeholder="XS, S, M, L, XL" style={IS} />
                     </div>
                     <div style={{ gridColumn:'1/-1' }}>
-                      <LB>Описание</LB>
+                      <LB>Описание товара</LB>
                       <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
                         placeholder="Материал, особенности, рекомендации по уходу..." rows={3}
                         style={{ ...IS, resize:'vertical', minHeight:80, lineHeight:1.5 }} />
@@ -419,6 +460,36 @@ export default function Admin() {
                   </div>
                 </div>
 
+                {/* ─ КОЛИЧЕСТВО ПО РАЗМЕРАМ ─ */}
+                {parsedSizesForStock.length > 0 && (
+                  <div>
+                    <ST>📦 Количество товара по размерам</ST>
+                    <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>
+                      Укажите остаток на складе для каждого размера. Если оставить 0 — размер будет показан как «нет в наличии».
+                    </p>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:10 }}>
+                      {parsedSizesForStock.map(size => (
+                        <div key={size} style={{ background:'#faf3ed', borderRadius:10, padding:'12px', border:'1.5px solid #ede4dc', textAlign:'center' }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#c9748a', marginBottom:8, letterSpacing:1 }}>{size}</div>
+                          <input
+                            type="number"
+                            min="0"
+                            value={form.sizeStock[size] ?? ''}
+                            onChange={e => updateSizeStock(size, e.target.value === '' ? '' : Number(e.target.value))}
+                            placeholder="0"
+                            style={{ width:'100%', padding:'6px 8px', border:'1.5px solid #ede4dc', borderRadius:7, fontSize:15, fontWeight:700, textAlign:'center', outline:'none', boxSizing:'border-box', background:'#fff' }}
+                          />
+                          <div style={{ fontSize:10, color:'#9e8e85', marginTop:4 }}>шт</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop:10, padding:'10px 14px', background:'#fff8f0', borderRadius:8, fontSize:12, color:'#9e8e85' }}>
+                      💡 Итого: {parsedSizesForStock.reduce((s, sz) => s + (Number(form.sizeStock[sz]) || 0), 0)} шт на всех размерах
+                    </div>
+                  </div>
+                )}
+
+                {/* Параметры */}
                 <div>
                   <ST>⚙️ Параметры</ST>
                   <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
@@ -434,6 +505,7 @@ export default function Admin() {
                   </div>
                 </div>
 
+                {/* Кнопки */}
                 <div style={{ display:'flex', gap:12, paddingTop:8, borderTop:'1px solid #ede4dc' }}>
                   <button onClick={saveProduct} disabled={!form.name||!form.price||loading}
                     style={{ flex:1, padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600, opacity:(!form.name||!form.price||loading)?.5:1 }}>
@@ -448,28 +520,27 @@ export default function Admin() {
             </div>
           )}
 
+          {/* ── Настройки ── */}
           {tab === 'settings' && (
             <div style={{ maxWidth:680 }}>
               <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>⚙️ Настройки сайта</h2>
               <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:22 }}>
-
                 <div>
-                  <ST>🖼️ Главный баннер (Hero-секция)</ST>
-                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:14 }}>Большое фото которое посетители видят при первом заходе на сайт</p>
+                  <ST>🖼️ Главный баннер</ST>
+                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:14 }}>Фото которое посетители видят при первом заходе</p>
                   {settings.hero_image ? (
-                    <div style={{ position:'relative', width:'100%', height:180, borderRadius:12, overflow:'hidden', marginBottom:12 }}>
+                    <div style={{ position:'relative', width:'100%', height:160, borderRadius:12, overflow:'hidden', marginBottom:12 }}>
                       <img src={settings.hero_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
                       <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
                         <label style={{ padding:'8px 16px', background:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>
                           Заменить
                           <input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} />
                         </label>
-                        <button onClick={()=>setSettings(s=>({...s,hero_image:''}))}
-                          style={{ padding:'8px 16px', background:'#fef2f2', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>Удалить</button>
+                        <button onClick={()=>setSettings(s=>({...s,hero_image:''}))} style={{ padding:'8px 16px', background:'#fef2f2', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>Удалить</button>
                       </div>
                     </div>
                   ) : (
-                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:140, border:'2px dashed #ede4dc', borderRadius:12, cursor:'pointer', color:'#9e8e85', background:'#fafafa', marginBottom:12 }}>
+                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:130, border:'2px dashed #ede4dc', borderRadius:12, cursor:'pointer', color:'#9e8e85', background:'#fafafa', marginBottom:12 }}>
                       <span style={{ fontSize:36, marginBottom:8 }}>🖼️</span>
                       <span style={{ fontSize:13 }}>Загрузить главное фото сайта</span>
                       <input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} />
@@ -484,12 +555,36 @@ export default function Admin() {
                     <input value={settings.hero_subtitle} onChange={e=>setSettings(s=>({...s,hero_subtitle:e.target.value}))} placeholder="Будуарное нижнее бельё для особых моментов" style={IS} />
                   </div>
                 </div>
-
                 <div>
                   <ST>🚚 Бесплатная доставка</ST>
-                  <LB>Минимальная сумма заказа для бесплатной доставки (₽)</LB>
+                  <LB>Минимальная сумма заказа (₽)</LB>
                   <input type="number" value={settings.free_delivery_amount} onChange={e=>setSettings(s=>({...s,free_delivery_amount:Number(e.target.value)}))} placeholder="10000" style={IS} />
-                  <p style={{ fontSize:12, color:'#9e8e85', marginTop:6 }}>При достижении этой суммы покупатель получает бесплатную доставку</p>
+                </div>
+                <div>
+                  <ST>🚚 Тексты доставки</ST>
+                  <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Эти тексты отображаются в блоке «Доставка и оплата» на сайте</p>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    <div>
+                      <LB>СДЭК</LB>
+                      <input value={settings.delivery_cdek || ''} onChange={e=>setSettings(s=>({...s,delivery_cdek:e.target.value}))} placeholder="от 290 ₽ · 2–5 дней" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Почта России</LB>
+                      <input value={settings.delivery_post || ''} onChange={e=>setSettings(s=>({...s,delivery_post:e.target.value}))} placeholder="от 250 ₽ · 5–10 дней" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Курьер</LB>
+                      <input value={settings.delivery_courier || ''} onChange={e=>setSettings(s=>({...s,delivery_courier:e.target.value}))} placeholder="от 350 ₽ · 1 день" style={IS} />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <ST>🔒 Политика возврата</ST>
+                  <LB>Текст о возврате товара</LB>
+                  <textarea value={settings.return_policy || ''} onChange={e=>setSettings(s=>({...s,return_policy:e.target.value}))}
+                    placeholder="Нижнее бельё не подлежит обмену и возврату..." rows={3}
+                    style={{ ...IS, resize:'vertical', minHeight:70, lineHeight:1.5 }} />
                 </div>
 
                 <button onClick={saveSettings} disabled={settingsLoading}
@@ -499,7 +594,6 @@ export default function Admin() {
               </div>
             </div>
           )}
-
         </div>
       </div>
     </>
