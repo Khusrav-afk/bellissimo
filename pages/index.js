@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../lib/supabase'
 import styles from '../styles/Home.module.css'
 
-export default function Home({ initialProducts, settings }) {
+export default function Home({ initialProducts, settings, featuredProducts }) {
   const [products] = useState(initialProducts || [])
   const [cart, setCart] = useState([])
   const [wishlist, setWishlist] = useState([])
@@ -346,6 +346,28 @@ export default function Home({ initialProducts, settings }) {
           {heroImg && <img src={heroImg} alt="Bellissimo Lingerie" loading="eager" />}
         </div>
       </section>
+
+      {/* Бегущая лента новинок */}
+      {featuredProducts && featuredProducts.length > 0 && (
+        <section className={styles.tickerSection}>
+          <div className={styles.tickerLabel}>✨ Новинки</div>
+          <div className={styles.tickerWrap}>
+            <div className={styles.tickerTrack}>
+              {[...featuredProducts, ...featuredProducts, ...featuredProducts].map((product, idx) => (
+                <div key={idx} className={styles.tickerItem} onClick={() => openLightbox(product)}>
+                  <div className={styles.tickerImg}>
+                    {product.images?.[0] && <img src={product.images[0]} alt={product.name} />}
+                  </div>
+                  <div className={styles.tickerInfo}>
+                    <div className={styles.tickerName}>{product.name}</div>
+                    <div className={styles.tickerPrice}>{product.price?.toLocaleString('ru')} ₽</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Shipping bar */}
       <div className={styles.shippingBar}>
@@ -855,8 +877,15 @@ export async function getServerSideProps() {
       supabase.from('products').select('*').eq('active', true).order('created_at', { ascending: false }),
       supabase.from('settings').select('*').eq('id', 1).single()
     ])
-    return { props: { initialProducts: productsRes.data || [], settings: settingsRes.data || null } }
+    const allProducts = productsRes.data || []
+    const settings = settingsRes.data || null
+    const featuredIds = settings?.featured_ids || []
+    // Новинки: выбранные в админке или товары с is_new
+    const featuredProducts = featuredIds.length > 0
+      ? allProducts.filter(p => featuredIds.includes(p.id))
+      : allProducts.filter(p => p.is_new).slice(0, 10)
+    return { props: { initialProducts: allProducts, settings, featuredProducts } }
   } catch {
-    return { props: { initialProducts: [], settings: null } }
+    return { props: { initialProducts: [], settings: null, featuredProducts: [] } }
   }
 }
