@@ -246,7 +246,8 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.nav}>
           <div className={styles.navInner}>
             {categories.map(cat => (
-              <button key={cat} className={`${styles.navLink} ${activeCategory===cat?styles.active:''}`}
+              <button key={cat}
+                className={`${styles.navLink} ${activeCategory===cat?styles.active:''} ${cat==='Скидки'?styles.navLinkSale:''}`}
                 onClick={() => selectCategory(cat)}>{cat}</button>
             ))}
           </div>
@@ -310,7 +311,7 @@ export default function Home({ initialProducts, settings }) {
         <div className={styles.catFilter}>
           {categories.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)}
-              className={`${styles.catBtn} ${activeCategory===cat?styles.catBtnActive:''}`}>{cat}</button>
+              className={`${styles.catBtn} ${activeCategory===cat?styles.catBtnActive:''} ${cat==='Скидки'&&activeCategory!==cat?styles.catBtnSale:''}`}>{cat}</button>
           ))}
         </div>
         {filtered.length === 0 ? (
@@ -333,9 +334,9 @@ export default function Home({ initialProducts, settings }) {
       <section className={styles.section} style={{paddingTop:0}}>
         <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p><div className={styles.dot}/></div>
         <div className={styles.delCards}>
-          <div className={styles.delCard}><div className={styles.di}>📦</div><h4>СДЭК</h4><p>Пункт выдачи или курьер до двери.</p><div className={styles.cost}>{settings?.delivery_cdek || 'от 290 ₽ · 2–5 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Любой населённый пункт страны.</p><div className={styles.cost}>{settings?.delivery_post || 'от 250 ₽ · 5–10 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Курьер</h4><p>Москва и СПб — в день заказа.</p><div className={styles.cost}>{settings?.delivery_courier || 'от 350 ₽ · 1 день'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Стандартная доставка по всей России.</p><div className={styles.cost}>{settings?.delivery_cdek || '590 ₽ · 5–14 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Срочная доставка</h4><p>Ускоренная отправка — приоритетная обработка.</p><div className={styles.cost}>{settings?.delivery_post || '1 100 ₽ · 2–5 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз</h4><p>Бесплатно в нашем магазине в Калининграде.</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно · по договорённости'}</div></div>
         </div>
         <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
         {settings?.return_policy && (
