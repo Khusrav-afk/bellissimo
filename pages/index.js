@@ -18,6 +18,9 @@ export default function Home({ initialProducts, settings }) {
   const [toast, setToast] = useState(null)
   const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
   const [orderSent, setOrderSent] = useState(false)
+  const [promoCode, setPromoCode] = useState('')
+  const [promoResult, setPromoResult] = useState(null) // {discount_type, discount_value, error}
+  const [promoLoading, setPromoLoading] = useState(false)
   const [lbQty, setLbQty] = useState(1)
   const [wishlistOpen, setWishlistOpen] = useState(false)
 
@@ -32,7 +35,12 @@ export default function Home({ initialProducts, settings }) {
   const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
   const deliveryCost = cartTotal >= FREE_DELIVERY ? 0 : 350
-  const orderTotal = cartTotal + deliveryCost
+  const promoDiscount = promoResult && !promoResult.error
+    ? (promoResult.discount_type === 'percent'
+        ? Math.round(cartTotal * promoResult.discount_value / 100)
+        : promoResult.discount_value)
+    : 0
+  const orderTotal = cartTotal - promoDiscount + deliveryCost
   const leftForFree = FREE_DELIVERY - cartTotal
 
   const heroImg = settings?.hero_image || products[0]?.images?.[0] || ''
@@ -107,6 +115,35 @@ export default function Home({ initialProducts, settings }) {
     setLightbox(l => ({...l, mediaIdx: (l.mediaIdx - 1 + lbTotal) % lbTotal}))
   }
 
+  async function applyPromo() {
+    if (!promoCode.trim()) return
+    setPromoLoading(true)
+    setPromoResult(null)
+    try {
+      const { data, error } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .eq('code', promoCode.trim().toUpperCase())
+        .eq('active', true)
+        .single()
+
+      if (error || !data) {
+        setPromoResult({ error: 'Промокод не найден или неактивен' })
+      } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        setPromoResult({ error: 'Срок действия промокода истёк' })
+      } else if (data.min_order > 0 && cartTotal < data.min_order) {
+        setPromoResult({ error: `Промокод действует от ${data.min_order.toLocaleString('ru')} ₽` })
+      } else {
+        setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id })
+        // Увеличиваем счётчик использований
+        await supabase.from('promo_codes').update({ used_count: (data.used_count || 0) + 1 }).eq('id', data.id)
+      }
+    } catch(e) {
+      setPromoResult({ error: 'Ошибка проверки промокода' })
+    }
+    setPromoLoading(false)
+  }
+
   function sendWhatsApp() {
     const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} = ${(x.price * x.qty).toLocaleString('ru')} ₽`).join('\n')
     const msg = `Здравствуйте! Хочу заказать:\n${items}\n\nИтого: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}`
@@ -116,7 +153,8 @@ export default function Home({ initialProducts, settings }) {
   function submitOrder(e) {
     e.preventDefault()
     const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
+    const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
+    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
     setOrderSent(true)
     setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
@@ -507,8 +545,32 @@ export default function Home({ initialProducts, settings }) {
                     <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
                       style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
                   </div>
+                  {/* Промокод */}
+                  <div>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Промокод</label>
+                    <div style={{display:'flex',gap:8}}>
+                      <input value={promoCode} onChange={e=>setPromoCode(e.target.value.toUpperCase())}
+                        placeholder="Введите промокод" disabled={!!promoResult&&!promoResult.error}
+                        style={{flex:1,padding:'10px 14px',border:`1.5px solid ${promoResult?.error?'#fca5a5':promoResult&&!promoResult.error?'#86efac':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',fontFamily:'monospace',letterSpacing:2}} />
+                      {promoResult && !promoResult.error ? (
+                        <button type="button" onClick={()=>{setPromoResult(null);setPromoCode('')}}
+                          style={{padding:'10px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,cursor:'pointer',fontSize:13,color:'#c45c5c',whiteSpace:'nowrap'}}>
+                          Убрать
+                        </button>
+                      ) : (
+                        <button type="button" onClick={applyPromo} disabled={!promoCode||promoLoading}
+                          style={{padding:'10px 16px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',opacity:!promoCode?0.5:1}}>
+                          {promoLoading?'...':'Применить'}
+                        </button>
+                      )}
+                    </div>
+                    {promoResult?.error && <div style={{fontSize:12,color:'#c45c5c',marginTop:5}}>❌ {promoResult.error}</div>}
+                    {promoResult&&!promoResult.error && <div style={{fontSize:12,color:'#3a7a3a',marginTop:5}}>✅ Промокод «{promoResult.code}» применён! Скидка {promoResult.discount_value}{promoResult.discount_type==='percent'?'%':' ₽'}</div>}
+                  </div>
+
                   <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:13}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span></div>
+                    {promoDiscount > 0 && <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'#3a7a3a'}}>Скидка ({promoResult.code}):</span><span style={{color:'#3a7a3a',fontWeight:600}}>−{promoDiscount.toLocaleString('ru')} ₽</span></div>}
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Доставка:</span><span style={{color:deliveryCost===0?'#3a7a3a':'inherit'}}>{deliveryCost===0?'Бесплатно':`~${deliveryCost} ₽`}</span></div>
                     <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15,borderTop:'1px solid var(--border)',paddingTop:8,marginTop:4}}><span>Итого:</span><span style={{color:'var(--accent-dark)'}}>{orderTotal.toLocaleString('ru')} ₽</span></div>
                   </div>
