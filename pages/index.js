@@ -350,29 +350,22 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
       {/* Бегущая лента новинок */}
       {featuredProducts && featuredProducts.length > 0 && (
         <section className={styles.tickerSection}>
-          <div className={styles.tickerLabel}>
-            <span>✨</span>
-            <span>Новинки</span>
+          <div className={styles.tickerSectionHeader}>
+            <div className={styles.tickerSectionTitle}>✨ Новинки</div>
+            <div className={styles.tickerSectionSub}>Нажмите на товар чтобы посмотреть подробнее</div>
           </div>
           <div className={styles.tickerWrap}>
             <div className={styles.tickerTrack}>
-              {/* Три копии для бесшовного зацикливания */}
               {[...featuredProducts, ...featuredProducts, ...featuredProducts].map((product, idx) => (
                 <div key={idx} className={styles.tickerItem} onClick={() => openLightbox(product)}>
                   <div className={styles.tickerImg}>
-                    {product.images?.[0] && (
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        loading="lazy"
-                      />
-                    )}
+                    {product.images?.[0] && <img src={product.images[0]} alt={product.name} loading="lazy" />}
+                    {product.is_new && <span className={styles.tagNew} style={{position:'absolute',top:10,left:10,zIndex:2}}>New</span>}
                   </div>
                   <div className={styles.tickerInfo}>
                     <div className={styles.tickerName}>{product.name}</div>
                     <div className={styles.tickerPrice}>{product.price?.toLocaleString('ru')} ₽</div>
                   </div>
-                  <div className={styles.tickerDot}>·</div>
                 </div>
               ))}
             </div>
