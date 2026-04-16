@@ -248,6 +248,13 @@
 .toastSuccess { background: var(--accent); }
 @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(16px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 
+
+/* ── Категория «Скидки» — розовая ── */
+.navLinkSale { color: var(--accent); font-weight: 600; }
+.navLinkSale::before { content: '🏷️ '; font-size: 10px; }
+.catBtnSale { color: var(--accent); border-color: var(--accent-light); background: #fdf3f5; font-weight: 600; }
+.catBtnSale::before { content: '🏷️ '; font-size: 10px; }
+
 /* ── Адаптив ── */
 @media (max-width: 1024px) {
   .hero { grid-template-columns: 1fr; }
