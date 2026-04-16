@@ -29,7 +29,8 @@ export default function Admin() {
 
   const [promos, setPromos] = useState([])
   const [promosLoading, setPromosLoading] = useState(false)
-  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', expires_at: '', active: true })
+  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', starts_at: '', expires_at: '', max_uses: '', categories: [], active: true })
+  const ALL_PROMO_CATS = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки', 'Пояса для чулок', 'Купальники']
 
   const emptyForm = {
     name: '', category: 'Комплекты', price: '', old_price: '',
@@ -70,7 +71,10 @@ export default function Admin() {
       discount_type: newPromo.discount_type,
       discount_value: Number(newPromo.discount_value),
       min_order: newPromo.min_order ? Number(newPromo.min_order) : 0,
+      starts_at: newPromo.starts_at || null,
       expires_at: newPromo.expires_at || null,
+      max_uses: newPromo.max_uses ? Number(newPromo.max_uses) : 0,
+      categories: newPromo.categories || [],
       active: newPromo.active,
       used_count: 0
     }
@@ -569,35 +573,37 @@ export default function Admin() {
               <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>🏷️ Промокоды</h2>
 
               {/* Создание нового промокода */}
-              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:24 }}>
+              <div style={{background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:24}}>
                 <ST>➕ Создать промокод</ST>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14 }}>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14}}>
                   <div>
                     <LB>Код промокода *</LB>
                     <input value={newPromo.code} onChange={e=>setNewPromo(p=>({...p,code:e.target.value.toUpperCase()}))}
                       placeholder="SALE20" style={IS} />
-                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>Только латиница и цифры, будет заглавными</div>
+                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>Только латиница и цифры</div>
                   </div>
                   <div>
                     <LB>Тип скидки *</LB>
                     <select value={newPromo.discount_type} onChange={e=>setNewPromo(p=>({...p,discount_type:e.target.value}))} style={IS}>
-                      <option value="percent">Процент (например, 10%)</option>
-                      <option value="fixed">Фиксированная сумма (₽)</option>
+                      <option value="percent">Процент (%)</option>
+                      <option value="fixed">Фиксированная (₽)</option>
                     </select>
                   </div>
                   <div>
                     <LB>Размер скидки *</LB>
                     <input type="number" value={newPromo.discount_value} onChange={e=>setNewPromo(p=>({...p,discount_value:e.target.value}))}
-                      placeholder={newPromo.discount_type==='percent'?'10 (= 10%)':'500 (= 500 ₽)'} style={IS} />
+                      placeholder={newPromo.discount_type==='percent'?'10':'500'} style={IS} />
                   </div>
                   <div>
                     <LB>Мин. сумма заказа (₽)</LB>
                     <input type="number" value={newPromo.min_order} onChange={e=>setNewPromo(p=>({...p,min_order:e.target.value}))}
-                      placeholder="0 (без ограничений)" style={IS} />
+                      placeholder="0 — без ограничений" style={IS} />
                   </div>
                   <div>
-                    <LB>Действует до</LB>
-                    <input type="date" value={newPromo.expires_at} onChange={e=>setNewPromo(p=>({...p,expires_at:e.target.value}))} style={IS} />
+                    <LB>Макс. активаций</LB>
+                    <input type="number" value={newPromo.max_uses} onChange={e=>setNewPromo(p=>({...p,max_uses:e.target.value}))}
+                      placeholder="0 — безлимит" style={IS} />
+                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>0 = неограниченно</div>
                   </div>
                   <div style={{display:'flex',alignItems:'flex-end'}}>
                     <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,padding:'10px 14px',background:newPromo.active?'#fdf3f5':'#fafafa',borderRadius:8,border:`1.5px solid ${newPromo.active?'#c9748a':'#ede4dc'}`,width:'100%'}}>
@@ -605,15 +611,61 @@ export default function Admin() {
                       Активен сразу
                     </label>
                   </div>
+                  <div>
+                    <LB>Действует С (начало)</LB>
+                    <input type="date" value={newPromo.starts_at} onChange={e=>setNewPromo(p=>({...p,starts_at:e.target.value}))} style={IS} />
+                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>Пусто = действует с сегодня</div>
+                  </div>
+                  <div>
+                    <LB>Действует ДО (конец)</LB>
+                    <input type="date" value={newPromo.expires_at} onChange={e=>setNewPromo(p=>({...p,expires_at:e.target.value}))} style={IS} />
+                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>Пусто = бессрочный</div>
+                  </div>
                 </div>
 
-                {/* Превью */}
+                <div style={{marginBottom:14}}>
+                  <LB>Категории товаров</LB>
+                  <div style={{padding:'12px',background:'#fafafa',borderRadius:10,border:'1.5px solid #ede4dc'}}>
+                    <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,marginBottom:10,fontWeight:600,color:'#c9748a'}}>
+                      <input type="checkbox"
+                        checked={newPromo.categories.length===0}
+                        onChange={e=>{ if(e.target.checked) setNewPromo(p=>({...p,categories:[]})) }}
+                        style={{accentColor:'#c9748a'}} />
+                      🏷️ Все категории (применяется к любому товару)
+                    </label>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+                      {['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники'].map(cat => (
+                        <label key={cat} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:12,padding:'5px 10px',background:newPromo.categories.includes(cat)?'#fdf3f5':'#fff',borderRadius:6,border:`1px solid ${newPromo.categories.includes(cat)?'#c9748a':'#ede4dc'}`}}>
+                          <input type="checkbox"
+                            checked={newPromo.categories.includes(cat)}
+                            onChange={e=>{
+                              setNewPromo(p=>({...p, categories: e.target.checked
+                                ? [...p.categories, cat]
+                                : p.categories.filter(c=>c!==cat)
+                              }))
+                            }}
+                            style={{accentColor:'#c9748a'}} />
+                          {cat}
+                        </label>
+                      ))}
+                    </div>
+                    <div style={{fontSize:11,color:'#9e8e85',marginTop:8}}>
+                      {newPromo.categories.length===0
+                        ? '✅ Применяется ко всем категориям'
+                        : `✅ Только для: ${newPromo.categories.join(', ')}`}
+                    </div>
+                  </div>
+                </div>
+
                 {newPromo.code && newPromo.discount_value && (
                   <div style={{padding:'10px 16px',background:'#fdf3f5',borderRadius:10,marginBottom:14,fontSize:13,border:'1px solid #f0c8d2'}}>
-                    <strong>Превью:</strong> Промокод <strong style={{color:'#c9748a',fontSize:15}}>«{newPromo.code}»</strong> даёт скидку{' '}
-                    <strong>{newPromo.discount_value}{newPromo.discount_type==='percent'?'%':' ₽'}</strong>
-                    {newPromo.min_order ? ` при заказе от ${Number(newPromo.min_order).toLocaleString('ru')} ₽` : ''}
-                    {newPromo.expires_at ? ` до ${new Date(newPromo.expires_at).toLocaleDateString('ru')}` : ''}
+                    <strong>Превью:</strong> «<strong style={{color:'#c9748a'}}>{newPromo.code}</strong>» —{' '}
+                    скидка <strong>{newPromo.discount_value}{newPromo.discount_type==='percent'?'%':' ₽'}</strong>
+                    {newPromo.categories.length>0&&` на категории: ${newPromo.categories.join(', ')}`}
+                    {newPromo.min_order?` · от ${Number(newPromo.min_order).toLocaleString('ru')} ₽`:''}
+                    {newPromo.max_uses?` · макс. ${newPromo.max_uses} раз`:' · безлимит'}
+                    {newPromo.starts_at?` · с ${new Date(newPromo.starts_at).toLocaleDateString('ru')}`:''}
+                    {newPromo.expires_at?` · до ${new Date(newPromo.expires_at).toLocaleDateString('ru')}`:''}
                   </div>
                 )}
 
@@ -623,7 +675,7 @@ export default function Admin() {
                 </button>
               </div>
 
-              {/* Список промокодов */}
+               {/* Список промокодов */}
               <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24 }}>
                 <ST>📋 Все промокоды</ST>
                 {promosLoading ? (
@@ -638,14 +690,23 @@ export default function Admin() {
                           {p.code}
                         </div>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b',marginBottom:3}}>
+                          <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b',marginBottom:4}}>
                             Скидка: <span style={{color:'#c9748a'}}>{p.discount_value}{p.discount_type==='percent'?'%':' ₽'}</span>
                             {p.min_order > 0 && <span style={{color:'#9e8e85',fontSize:12,marginLeft:8}}>от {p.min_order?.toLocaleString('ru')} ₽</span>}
                           </div>
-                          <div style={{fontSize:12,color:'#9e8e85',display:'flex',gap:12,flexWrap:'wrap'}}>
-                            <span>Использован: {p.used_count || 0} раз</span>
+                          <div style={{fontSize:12,color:'#9e8e85',display:'flex',gap:12,flexWrap:'wrap',marginBottom:4}}>
+                            <span>Активировано: <strong style={{color:'#3a2f2b'}}>{p.used_count||0}</strong>{p.max_uses>0?`/${p.max_uses}`:''} раз</span>
+                            {p.starts_at && <span>С: {new Date(p.starts_at).toLocaleDateString('ru')}</span>}
                             {p.expires_at && <span>До: {new Date(p.expires_at).toLocaleDateString('ru')}</span>}
                           </div>
+                          {p.categories?.length>0 && (
+                            <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                              {p.categories.map(c=>(
+                                <span key={c} style={{padding:'2px 8px',background:'#fdf3f5',border:'1px solid #f0c8d2',borderRadius:4,fontSize:10,color:'#c9748a'}}>{c}</span>
+                              ))}
+                            </div>
+                          )}
+                          {(!p.categories||p.categories.length===0) && <span style={{fontSize:11,color:'#9e8e85'}}>📦 Все категории</span>}
                         </div>
                         <div style={{display:'flex',gap:8,flexShrink:0}}>
                           <span style={{padding:'3px 10px',borderRadius:6,fontSize:11,background:p.active?'#edf7ed':'#fef2f2',color:p.active?'#3a7a3a':'#c45c5c',fontWeight:600}}>
