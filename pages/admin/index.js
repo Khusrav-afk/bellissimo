@@ -27,6 +27,10 @@ export default function Admin() {
   })
   const [settingsLoading, setSL] = useState(false)
 
+  const [promos, setPromos] = useState([])
+  const [promosLoading, setPromosLoading] = useState(false)
+  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', expires_at: '', active: true })
+
   const emptyForm = {
     name: '', category: 'Комплекты', price: '', old_price: '',
     description: '', sizes: '', sizeStock: {}, is_new: false, active: true,
@@ -34,7 +38,7 @@ export default function Admin() {
   }
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { if (auth) { loadProducts(); loadSettings() } }, [auth])
+  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos() } }, [auth])
 
   async function loadProducts() {
     setLoading(true)
@@ -49,6 +53,44 @@ export default function Admin() {
       const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
       if (data) setSettings(data)
     } catch {}
+  }
+
+  async function loadPromos() {
+    setPromosLoading(true)
+    const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false })
+    setPromos(data || [])
+    setPromosLoading(false)
+  }
+
+  async function createPromo() {
+    if (!newPromo.code.trim()) return showMsg('❌ Введите код промокода', 'error')
+    if (!newPromo.discount_value) return showMsg('❌ Введите размер скидки', 'error')
+    const payload = {
+      code: newPromo.code.trim().toUpperCase(),
+      discount_type: newPromo.discount_type,
+      discount_value: Number(newPromo.discount_value),
+      min_order: newPromo.min_order ? Number(newPromo.min_order) : 0,
+      expires_at: newPromo.expires_at || null,
+      active: newPromo.active,
+      used_count: 0
+    }
+    const { error } = await supabase.from('promo_codes').insert([payload])
+    if (error) return showMsg('❌ Ошибка: ' + error.message, 'error')
+    showMsg('✅ Промокод создан!')
+    setNewPromo({ code: '', discount_type: 'percent', discount_value: '', min_order: '', expires_at: '', active: true })
+    loadPromos()
+  }
+
+  async function togglePromo(id, active) {
+    await supabase.from('promo_codes').update({ active: !active }).eq('id', id)
+    loadPromos()
+  }
+
+  async function deletePromo(id) {
+    if (!confirm('Удалить промокод?')) return
+    await supabase.from('promo_codes').delete().eq('id', id)
+    loadPromos()
+    showMsg('🗑 Промокод удалён')
   }
 
   async function saveSettings() {
@@ -275,7 +317,7 @@ export default function Admin() {
             <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
+            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['promo','🏷️ Промокоды'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
               <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
                 style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400 }}>
                 {label}{count !== undefined ? ` (${count})` : ''}
@@ -520,6 +562,112 @@ export default function Admin() {
             </div>
           )}
 
+
+          {/* ── Промокоды ── */}
+          {tab === 'promo' && (
+            <div style={{ maxWidth:900 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>🏷️ Промокоды</h2>
+
+              {/* Создание нового промокода */}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:24 }}>
+                <ST>➕ Создать промокод</ST>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14 }}>
+                  <div>
+                    <LB>Код промокода *</LB>
+                    <input value={newPromo.code} onChange={e=>setNewPromo(p=>({...p,code:e.target.value.toUpperCase()}))}
+                      placeholder="SALE20" style={IS} />
+                    <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>Только латиница и цифры, будет заглавными</div>
+                  </div>
+                  <div>
+                    <LB>Тип скидки *</LB>
+                    <select value={newPromo.discount_type} onChange={e=>setNewPromo(p=>({...p,discount_type:e.target.value}))} style={IS}>
+                      <option value="percent">Процент (например, 10%)</option>
+                      <option value="fixed">Фиксированная сумма (₽)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <LB>Размер скидки *</LB>
+                    <input type="number" value={newPromo.discount_value} onChange={e=>setNewPromo(p=>({...p,discount_value:e.target.value}))}
+                      placeholder={newPromo.discount_type==='percent'?'10 (= 10%)':'500 (= 500 ₽)'} style={IS} />
+                  </div>
+                  <div>
+                    <LB>Мин. сумма заказа (₽)</LB>
+                    <input type="number" value={newPromo.min_order} onChange={e=>setNewPromo(p=>({...p,min_order:e.target.value}))}
+                      placeholder="0 (без ограничений)" style={IS} />
+                  </div>
+                  <div>
+                    <LB>Действует до</LB>
+                    <input type="date" value={newPromo.expires_at} onChange={e=>setNewPromo(p=>({...p,expires_at:e.target.value}))} style={IS} />
+                  </div>
+                  <div style={{display:'flex',alignItems:'flex-end'}}>
+                    <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,padding:'10px 14px',background:newPromo.active?'#fdf3f5':'#fafafa',borderRadius:8,border:`1.5px solid ${newPromo.active?'#c9748a':'#ede4dc'}`,width:'100%'}}>
+                      <input type="checkbox" checked={newPromo.active} onChange={e=>setNewPromo(p=>({...p,active:e.target.checked}))} style={{accentColor:'#c9748a'}} />
+                      Активен сразу
+                    </label>
+                  </div>
+                </div>
+
+                {/* Превью */}
+                {newPromo.code && newPromo.discount_value && (
+                  <div style={{padding:'10px 16px',background:'#fdf3f5',borderRadius:10,marginBottom:14,fontSize:13,border:'1px solid #f0c8d2'}}>
+                    <strong>Превью:</strong> Промокод <strong style={{color:'#c9748a',fontSize:15}}>«{newPromo.code}»</strong> даёт скидку{' '}
+                    <strong>{newPromo.discount_value}{newPromo.discount_type==='percent'?'%':' ₽'}</strong>
+                    {newPromo.min_order ? ` при заказе от ${Number(newPromo.min_order).toLocaleString('ru')} ₽` : ''}
+                    {newPromo.expires_at ? ` до ${new Date(newPromo.expires_at).toLocaleDateString('ru')}` : ''}
+                  </div>
+                )}
+
+                <button onClick={createPromo}
+                  style={{padding:'12px 28px',background:'linear-gradient(135deg,#c9748a,#a55570)',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:600}}>
+                  ✅ Создать промокод
+                </button>
+              </div>
+
+              {/* Список промокодов */}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24 }}>
+                <ST>📋 Все промокоды</ST>
+                {promosLoading ? (
+                  <p style={{color:'#9e8e85',textAlign:'center',padding:24}}>⏳ Загрузка...</p>
+                ) : promos.length === 0 ? (
+                  <p style={{color:'#9e8e85',textAlign:'center',padding:32}}>Промокодов пока нет. Создайте первый!</p>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    {promos.map(p => (
+                      <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',background:p.active?'#fff':'#fafafa',border:`1.5px solid ${p.active?'#ede4dc':'#fca5a5'}`,borderRadius:12,flexWrap:'wrap'}}>
+                        <div style={{background:'#fdf3f5',border:'2px solid #f0c8d2',borderRadius:8,padding:'6px 14px',fontFamily:'monospace',fontSize:16,fontWeight:700,color:'#c9748a',letterSpacing:2,flexShrink:0}}>
+                          {p.code}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b',marginBottom:3}}>
+                            Скидка: <span style={{color:'#c9748a'}}>{p.discount_value}{p.discount_type==='percent'?'%':' ₽'}</span>
+                            {p.min_order > 0 && <span style={{color:'#9e8e85',fontSize:12,marginLeft:8}}>от {p.min_order?.toLocaleString('ru')} ₽</span>}
+                          </div>
+                          <div style={{fontSize:12,color:'#9e8e85',display:'flex',gap:12,flexWrap:'wrap'}}>
+                            <span>Использован: {p.used_count || 0} раз</span>
+                            {p.expires_at && <span>До: {new Date(p.expires_at).toLocaleDateString('ru')}</span>}
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:8,flexShrink:0}}>
+                          <span style={{padding:'3px 10px',borderRadius:6,fontSize:11,background:p.active?'#edf7ed':'#fef2f2',color:p.active?'#3a7a3a':'#c45c5c',fontWeight:600}}>
+                            {p.active?'● Активен':'● Отключён'}
+                          </span>
+                          <button onClick={()=>togglePromo(p.id,p.active)}
+                            style={{padding:'5px 10px',background:'#faf3ed',border:'1px solid #ede4dc',borderRadius:6,cursor:'pointer',fontSize:12}}>
+                            {p.active?'Отключить':'Включить'}
+                          </button>
+                          <button onClick={()=>deletePromo(p.id)}
+                            style={{padding:'5px 10px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c45c5c'}}>
+                            🗑
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Настройки ── */}
           {tab === 'settings' && (
             <div style={{ maxWidth:680 }}>
@@ -565,15 +713,15 @@ export default function Admin() {
                   <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Эти тексты отображаются в блоке «Доставка и оплата» на сайте</p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     <div>
-                      <LB>Почта России (стандарт)</LB>
+                      <LB>Стандартная доставка (Почта РФ)</LB>
                       <input value={settings.delivery_cdek || ''} onChange={e=>setSettings(s=>({...s,delivery_cdek:e.target.value}))} placeholder="590 ₽ · 5–14 дней" style={IS} />
                     </div>
                     <div>
-                      <LB>Срочная доставка</LB>
+                      <LB>Срочная доставка (Приоритет)</LB>
                       <input value={settings.delivery_post || ''} onChange={e=>setSettings(s=>({...s,delivery_post:e.target.value}))} placeholder="1 100 ₽ · 2–5 дней" style={IS} />
                     </div>
                     <div>
-                      <LB>Самовывоз (Калининград)</LB>
+                      <LB>Самовывоз в Калининграде</LB>
                       <input value={settings.delivery_courier || ''} onChange={e=>setSettings(s=>({...s,delivery_courier:e.target.value}))} placeholder="Бесплатно · по договорённости" style={IS} />
                     </div>
                   </div>
