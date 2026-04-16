@@ -20,9 +20,9 @@ export default function Admin() {
   const [dragIdx, setDragIdx] = useState(null)
   const [settings, setSettings] = useState({ 
     hero_title: '', hero_subtitle: '', hero_image: '', free_delivery_amount: 10000,
-    delivery_cdek: 'от 290 ₽ · 2–5 дней',
-    delivery_post: 'от 250 ₽ · 5–10 дней',
-    delivery_courier: 'от 350 ₽ · 1 день',
+    delivery_cdek: '590 ₽ · 5–14 дней',
+    delivery_post: '1 100 ₽ · 2–5 дней',
+    delivery_courier: 'Бесплатно · по договорённости',
     return_policy: 'Нижнее бельё не подлежит обмену и возврату по санитарным нормам'
   })
   const [settingsLoading, setSL] = useState(false)
@@ -565,16 +565,16 @@ export default function Admin() {
                   <p style={{ fontSize:12, color:'#9e8e85', marginBottom:12 }}>Эти тексты отображаются в блоке «Доставка и оплата» на сайте</p>
                   <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
                     <div>
-                      <LB>СДЭК</LB>
-                      <input value={settings.delivery_cdek || ''} onChange={e=>setSettings(s=>({...s,delivery_cdek:e.target.value}))} placeholder="от 290 ₽ · 2–5 дней" style={IS} />
+                      <LB>Почта России (стандарт)</LB>
+                      <input value={settings.delivery_cdek || ''} onChange={e=>setSettings(s=>({...s,delivery_cdek:e.target.value}))} placeholder="590 ₽ · 5–14 дней" style={IS} />
                     </div>
                     <div>
-                      <LB>Почта России</LB>
-                      <input value={settings.delivery_post || ''} onChange={e=>setSettings(s=>({...s,delivery_post:e.target.value}))} placeholder="от 250 ₽ · 5–10 дней" style={IS} />
+                      <LB>Срочная доставка</LB>
+                      <input value={settings.delivery_post || ''} onChange={e=>setSettings(s=>({...s,delivery_post:e.target.value}))} placeholder="1 100 ₽ · 2–5 дней" style={IS} />
                     </div>
                     <div>
-                      <LB>Курьер</LB>
-                      <input value={settings.delivery_courier || ''} onChange={e=>setSettings(s=>({...s,delivery_courier:e.target.value}))} placeholder="от 350 ₽ · 1 день" style={IS} />
+                      <LB>Самовывоз (Калининград)</LB>
+                      <input value={settings.delivery_courier || ''} onChange={e=>setSettings(s=>({...s,delivery_courier:e.target.value}))} placeholder="Бесплатно · по договорённости" style={IS} />
                     </div>
                   </div>
                 </div>
