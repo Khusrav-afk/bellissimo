@@ -257,20 +257,24 @@
 
 
 /* ── Бегущая лента новинок ── */
-.tickerSection { display: flex; align-items: stretch; background: linear-gradient(135deg, #3a2f2b, #5a3a48); overflow: hidden; height: 110px; }
-.tickerLabel { background: var(--accent); color: #fff; padding: 0 28px; font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; z-index: 2; gap: 4px; min-width: 90px; }
-.tickerLabel span:first-child { font-size: 22px; }
-.tickerWrap { flex: 1; overflow: hidden; display: flex; align-items: center; -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%); mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%); }
-.tickerTrack { display: flex; align-items: center; animation: tickerMove 40s linear infinite; will-change: transform; }
+/* ── Бегущая лента новинок — карточки как у товаров ── */
+.tickerSection { background: var(--bg2); overflow: hidden; padding: 40px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); position: relative; }
+.tickerSectionHeader { text-align: center; margin-bottom: 28px; }
+.tickerSectionTitle { font-family: var(--serif); font-size: 28px; font-weight: 300; color: var(--text); margin-bottom: 6px; }
+.tickerSectionSub { font-size: 13px; color: var(--muted); }
+.tickerLabel { display: none; }
+.tickerWrap { overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%); mask-image: linear-gradient(to right, transparent 0%, black 4%, black 96%, transparent 100%); }
+.tickerTrack { display: flex; gap: 16px; animation: tickerMove 50s linear infinite; will-change: transform; padding: 0 8px; }
 .tickerTrack:hover { animation-play-state: paused; }
-.tickerItem { display: flex; align-items: center; gap: 12px; padding: 0 24px; cursor: pointer; height: 110px; border-right: 1px solid rgba(255,255,255,.08); transition: background .2s; white-space: nowrap; flex-shrink: 0; }
-.tickerItem:hover { background: rgba(255,255,255,.07); }
-.tickerImg { width: 56px; height: 72px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,.1); flex-shrink: 0; }
-.tickerImg img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; }
-.tickerInfo { display: flex; flex-direction: column; gap: 3px; }
-.tickerName { color: rgba(255,255,255,.9); font-size: 14px; font-family: var(--serif); max-width: 160px; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
-.tickerPrice { color: var(--accent-light); font-size: 13px; font-weight: 700; }
-.tickerDot { color: rgba(255,255,255,.15); font-size: 22px; padding: 0 6px; flex-shrink: 0; }
+.tickerItem { flex-shrink: 0; width: 200px; cursor: pointer; background: var(--card); border-radius: var(--radius); overflow: hidden; transition: transform .3s, box-shadow .3s; }
+.tickerItem:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(58,47,43,.1); }
+.tickerImg { width: 200px; height: 266px; overflow: hidden; background: var(--bg2); position: relative; }
+.tickerImg img { width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block; transition: transform .5s; }
+.tickerItem:hover .tickerImg img { transform: scale(1.05); }
+.tickerInfo { padding: 12px 14px 14px; }
+.tickerName { color: var(--text); font-size: 13px; font-family: var(--serif); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 4px; line-height: 1.3; }
+.tickerPrice { color: var(--accent-dark); font-size: 14px; font-weight: 700; }
+.tickerDot { display: none; }
 @keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-33.333%); } }
 
 /* ── Адаптив ── */
