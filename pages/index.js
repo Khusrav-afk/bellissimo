@@ -35,10 +35,15 @@ export default function Home({ initialProducts, settings }) {
   const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
   const deliveryCost = cartTotal >= FREE_DELIVERY ? 0 : 350
+  const promoBaseAmount = promoResult && !promoResult.error
+    ? (promoResult.categories && promoResult.categories.length > 0
+        ? cart.filter(x => promoResult.categories.includes(x.category)).reduce((s,x) => s + x.price * x.qty, 0)
+        : cartTotal)
+    : 0
   const promoDiscount = promoResult && !promoResult.error
     ? (promoResult.discount_type === 'percent'
-        ? Math.round(cartTotal * promoResult.discount_value / 100)
-        : promoResult.discount_value)
+        ? Math.round(promoBaseAmount * promoResult.discount_value / 100)
+        : Math.min(promoResult.discount_value, promoBaseAmount))
     : 0
   const orderTotal = cartTotal - promoDiscount + deliveryCost
   const leftForFree = FREE_DELIVERY - cartTotal
@@ -120,26 +125,40 @@ export default function Home({ initialProducts, settings }) {
     setPromoLoading(true)
     setPromoResult(null)
     try {
+      const code = promoCode.trim().toUpperCase()
       const { data, error } = await supabase
         .from('promo_codes')
         .select('*')
-        .eq('code', promoCode.trim().toUpperCase())
-        .eq('active', true)
+        .eq('code', code)
         .single()
 
       if (error || !data) {
-        setPromoResult({ error: 'Промокод не найден или неактивен' })
+        setPromoResult({ error: `Промокод «${code}» не существует. Проверьте правильность написания.` })
+      } else if (!data.active) {
+        setPromoResult({ error: `Промокод «${code}» отключён и не может быть использован.` })
+      } else if (data.starts_at && new Date(data.starts_at) > new Date()) {
+        const startDate = new Date(data.starts_at).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'})
+        setPromoResult({ error: `Промокод «${code}» ещё не действует. Он начнёт работать ${startDate}.` })
       } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        setPromoResult({ error: 'Срок действия промокода истёк' })
+        const expDate = new Date(data.expires_at).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'})
+        setPromoResult({ error: `Срок действия промокода «${code}» истёк ${expDate}.` })
+      } else if (data.max_uses > 0 && (data.used_count || 0) >= data.max_uses) {
+        setPromoResult({ error: `Промокод «${code}» уже использован максимальное количество раз (${data.max_uses}).` })
       } else if (data.min_order > 0 && cartTotal < data.min_order) {
-        setPromoResult({ error: `Промокод действует от ${data.min_order.toLocaleString('ru')} ₽` })
+        setPromoResult({ error: `Промокод «${code}» действует при заказе от ${data.min_order.toLocaleString('ru')} ₽. Добавьте ещё товаров на ${(data.min_order - cartTotal).toLocaleString('ru')} ₽.` })
+      } else if (data.categories && data.categories.length > 0) {
+        // Проверяем есть ли в корзине товары нужных категорий
+        const hasValidItems = cart.some(item => data.categories.includes(item.category))
+        if (!hasValidItems) {
+          setPromoResult({ error: `Промокод «${code}» действует только на: ${data.categories.join(', ')}.` })
+        } else {
+          setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id, categories: data.categories })
+        }
       } else {
-        setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id })
-        // Увеличиваем счётчик использований
-        await supabase.from('promo_codes').update({ used_count: (data.used_count || 0) + 1 }).eq('id', data.id)
+        setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id, categories: [] })
       }
     } catch(e) {
-      setPromoResult({ error: 'Ошибка проверки промокода' })
+      setPromoResult({ error: 'Не удалось проверить промокод. Попробуйте позже.' })
     }
     setPromoLoading(false)
   }
