@@ -29,7 +29,9 @@ export default function Admin() {
 
   const [promos, setPromos] = useState([])
   const [promosLoading, setPromosLoading] = useState(false)
-  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', starts_at: '', expires_at: '', max_uses: '', categories: [], active: true })
+  const [featuredIds, setFeaturedIds] = useState([])
+  const [featuredLoading, setFeaturedLoading] = useState(false)
+  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', starts_at: '', expires_at: '', max_uses: '', categories: [] })
   const ALL_PROMO_CATS = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки', 'Пояса для чулок', 'Купальники']
 
   const emptyForm = {
@@ -39,7 +41,7 @@ export default function Admin() {
   }
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos() } }, [auth])
+  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos(); loadFeatured() } }, [auth])
 
   async function loadProducts() {
     setLoading(true)
@@ -54,6 +56,28 @@ export default function Admin() {
       const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
       if (data) setSettings(data)
     } catch {}
+  }
+
+  async function loadFeatured() {
+    setFeaturedLoading(true)
+    try {
+      const { data } = await supabase.from('settings').select('featured_ids').eq('id', 1).single()
+      setFeaturedIds(data?.featured_ids || [])
+    } catch {}
+    setFeaturedLoading(false)
+  }
+
+  async function saveFeatured(ids) {
+    await supabase.from('settings').upsert({ id: 1, featured_ids: ids })
+    setFeaturedIds(ids)
+    showMsg('✅ Новинки сохранены!')
+  }
+
+  function toggleFeatured(id) {
+    const newIds = featuredIds.includes(id)
+      ? featuredIds.filter(x => x !== id)
+      : [...featuredIds, id]
+    saveFeatured(newIds)
   }
 
   async function loadPromos() {
@@ -75,7 +99,7 @@ export default function Admin() {
       expires_at: newPromo.expires_at || null,
       max_uses: newPromo.max_uses ? Number(newPromo.max_uses) : 0,
       categories: newPromo.categories || [],
-      active: newPromo.active,
+      active: true,
       used_count: 0
     }
     const { error } = await supabase.from('promo_codes').insert([payload])
@@ -321,7 +345,7 @@ export default function Admin() {
             <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['promo','🏷️ Промокоды'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
+            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['featured','✨ Новинки'],['promo','🏷️ Промокоды'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
               <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
                 style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400 }}>
                 {label}{count !== undefined ? ` (${count})` : ''}
@@ -605,12 +629,7 @@ export default function Admin() {
                       placeholder="0 — безлимит" style={IS} />
                     <div style={{fontSize:10,color:'#9e8e85',marginTop:3}}>0 = неограниченно</div>
                   </div>
-                  <div style={{display:'flex',alignItems:'flex-end'}}>
-                    <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:13,padding:'10px 14px',background:newPromo.active?'#fdf3f5':'#fafafa',borderRadius:8,border:`1.5px solid ${newPromo.active?'#c9748a':'#ede4dc'}`,width:'100%'}}>
-                      <input type="checkbox" checked={newPromo.active} onChange={e=>setNewPromo(p=>({...p,active:e.target.checked}))} style={{accentColor:'#c9748a'}} />
-                      Активен сразу
-                    </label>
-                  </div>
+
                   <div>
                     <LB>Действует С (начало)</LB>
                     <input type="date" value={newPromo.starts_at} onChange={e=>setNewPromo(p=>({...p,starts_at:e.target.value}))} style={IS} />
