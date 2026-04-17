@@ -20,9 +20,9 @@ export default function Admin() {
   const [dragIdx, setDragIdx] = useState(null)
   const [settings, setSettings] = useState({ 
     hero_title: '', hero_subtitle: '', hero_image: '', free_delivery_amount: 10000,
-    delivery_cdek: '590 ₽ · 5–14 дней',
-    delivery_post: '1 100 ₽ · 2–5 дней',
-    delivery_courier: 'Бесплатно · по договорённости',
+    delivery_cdek: 'Почта РФ стандарт · 590 ₽ · 5–14 дней',
+    delivery_post: 'Срочная доставка · 1 100 ₽ · 2–5 дней',
+    delivery_courier: 'Самовывоз в Калининграде · Бесплатно',
     return_policy: 'Нижнее бельё не подлежит обмену и возврату по санитарным нормам'
   })
   const [settingsLoading, setSL] = useState(false)
@@ -153,7 +153,8 @@ export default function Admin() {
           return { ...f, images: imgs }
         })
       } catch (e) {
-        showMsg('❌ Ошибка загрузки фото: ' + e.message, 'error')
+        console.error('Photo upload error:', e)
+        showMsg('❌ Ошибка загрузки фото: ' + (e.message || 'Проверьте настройки Storage в Supabase'), 'error')
       }
     }
     setUploading(false)
@@ -238,21 +239,28 @@ export default function Admin() {
 
     setLoading(true)
     try {
-      let error
+      let result
       if (editProduct) {
-        const r = await supabase.from('products').update(payload).eq('id', editProduct.id)
-        error = r.error
+        result = await supabase.from('products').update(payload).eq('id', editProduct.id)
       } else {
-        const r = await supabase.from('products').insert([payload])
-        error = r.error
+        result = await supabase.from('products').insert([payload])
       }
-      if (error) throw new Error(error.message)
+      
+      if (result.error) {
+        // Детальное сообщение об ошибке
+        const errMsg = result.error.message || result.error.details || JSON.stringify(result.error)
+        console.error('Supabase error:', result.error)
+        throw new Error(errMsg)
+      }
+      
       showMsg(editProduct ? '✅ Товар обновлён!' : '✅ Товар добавлен!')
       resetForm()
       await loadProducts()
       setTab('list')
     } catch (e) {
-      showMsg('❌ Ошибка сохранения: ' + e.message, 'error')
+      console.error('Save error:', e)
+      const errText = e.message || String(e)
+      showMsg('❌ Ошибка: ' + errText, 'error')
     } finally {
       setLoading(false)
     }
@@ -752,6 +760,9 @@ export default function Admin() {
           {tab === 'settings' && (
             <div style={{ maxWidth:680 }}>
               <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>⚙️ Настройки сайта</h2>
+              <div style={{ background:'#fff3cd', border:'1.5px solid #ffc107', borderRadius:12, padding:'12px 18px', marginBottom:16, fontSize:13, color:'#856404' }}>
+                ⚠️ Если товары не сохраняются — запусти <strong>supabase-fix.sql</strong> в Supabase → SQL Editor
+              </div>
               <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:22 }}>
                 <div>
                   <ST>🖼️ Главный баннер</ST>
