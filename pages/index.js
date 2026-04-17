@@ -417,9 +417,9 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
       <section className={styles.section} style={{paddingTop:0}}>
         <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p><div className={styles.dot}/></div>
         <div className={styles.delCards}>
-          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Стандартная доставка по всей России.</p><div className={styles.cost}>{settings?.delivery_cdek || '590 ₽ · 5–14 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Срочная доставка</h4><p>Ускоренная отправка — приоритетная обработка.</p><div className={styles.cost}>{settings?.delivery_post || '1 100 ₽ · 2–5 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз</h4><p>Бесплатно в нашем магазине в Калининграде.</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно · по договорённости'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Стандартная доставка в любую точку России.</p><div className={styles.cost}>{settings?.delivery_cdek || '590 ₽ · 5–14 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Срочная доставка</h4><p>Приоритетная отправка — быстрее обычного.</p><div className={styles.cost}>{settings?.delivery_post || '1 100 ₽ · 2–5 дней'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз в Калининграде</h4><p>Бесплатно — заберите заказ из нашего магазина.</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно'}</div></div>
         </div>
         <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
         {settings?.return_policy && (
