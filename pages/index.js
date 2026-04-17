@@ -439,6 +439,57 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
+      {/* Карта — где нас найти */}
+      <section className={styles.mapSection}>
+        <div className={styles.mapInner}>
+          <div className={styles.mapText}>
+            <div className={styles.sHeader} style={{textAlign:'left',marginBottom:20}}>
+              <h2>Самовывоз в Калининграде</h2>
+              <p>Заберите заказ бесплатно из нашего магазина</p>
+              <div className={styles.dot} style={{margin:'12px 0 0'}}/>
+            </div>
+            <div className={styles.mapDetails}>
+              <div className={styles.mapDetail}>
+                <span>📍</span>
+                <div>
+                  <strong>Адрес</strong>
+                  <p>Калининград, магазин «Европа»</p>
+                </div>
+              </div>
+              <div className={styles.mapDetail}>
+                <span>🏪</span>
+                <div>
+                  <strong>Самовывоз</strong>
+                  <p>Бесплатно · по договорённости</p>
+                </div>
+              </div>
+              <div className={styles.mapDetail}>
+                <span>💬</span>
+                <div>
+                  <strong>Уточнить время</strong>
+                  <p>Напишите нам в WhatsApp перед визитом</p>
+                </div>
+              </div>
+            </div>
+            <a href="https://wa.me/79114589339?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21+%D0%A5%D0%BE%D1%87%D1%83+%D1%83%D1%82%D0%BE%D1%87%D0%BD%D0%B8%D1%82%D1%8C+%D0%B2%D1%80%D0%B5%D0%BC%D1%8F+%D1%81%D0%B0%D0%BC%D0%BE%D0%B2%D1%8B%D0%B2%D0%BE%D0%B7%D0%B0"
+              target="_blank" rel="noreferrer" className={styles.waBtn} style={{marginTop:24,display:'inline-flex'}}>
+              💬 Уточнить время самовывоза
+            </a>
+          </div>
+          <div className={styles.mapFrame}>
+            <iframe
+              src="https://yandex.ru/map-widget/v1/?ll=20.502663%2C54.717891&z=16&pt=20.502663%2C54.717891%2Cpm2rdm&org=1706976737"
+              width="100%"
+              height="100%"
+              frameBorder="0"
+              allowFullScreen
+              title="Bellissimo Lingerie на карте"
+              style={{borderRadius:'var(--radius)',border:'none'}}
+            />
+          </div>
+        </div>
+      </section>
+
       {/* WhatsApp баннер */}
       <section className={styles.waBanner}>
         <div className={styles.waInner}>
