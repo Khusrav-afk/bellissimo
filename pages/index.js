@@ -25,7 +25,9 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const [wishlistOpen, setWishlistOpen] = useState(false)
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
-  const categories = ['Все','Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники','Скидки']
+  const customCats = settings?.custom_categories || []
+  const baseFallback = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
+  const categories = ['Все', ...(customCats.length > 0 ? customCats : baseFallback), 'Скидки']
   const searchResults = searchQuery.length > 1
     ? products.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || p.category?.toLowerCase().includes(searchQuery.toLowerCase()))
     : []
