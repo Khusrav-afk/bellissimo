@@ -3,7 +3,7 @@ import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'bellissimo2025'
-const CATEGORIES = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки', 'Пояса для чулок', 'Купальники']
+const DEFAULT_CATEGORIES = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
 const BUCKET = 'product'
 
 export default function Admin() {
@@ -32,6 +32,8 @@ export default function Admin() {
   const [featuredIds, setFeaturedIds] = useState([])
   const [featuredLoading, setFeaturedLoading] = useState(false)
   const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', starts_at: '', expires_at: '', max_uses: '', categories: [] })
+  const [allCategories, setAllCategories] = useState(DEFAULT_CATEGORIES)
+  const [newCatName, setNewCatName] = useState('')
   const ALL_PROMO_CATS = ['Комплекты', 'Бюстгальтеры', 'Корсеты', 'Пижамы', 'Боди', 'Ночные сорочки', 'Халаты', 'Трусики', 'Чулки', 'Пояса для чулок', 'Купальники']
 
   const emptyForm = {
@@ -41,7 +43,7 @@ export default function Admin() {
   }
   const [form, setForm] = useState(emptyForm)
 
-  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos(); loadFeatured() } }, [auth])
+  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos(); loadFeatured(); loadCategories() } }, [auth])
 
   async function loadProducts() {
     setLoading(true)
@@ -56,6 +58,46 @@ export default function Admin() {
       const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
       if (data) setSettings(data)
     } catch {}
+  }
+
+  async function loadCategories() {
+    try {
+      const { data } = await supabase.from('settings').select('custom_categories').eq('id', 1).single()
+      if (data?.custom_categories && data.custom_categories.length > 0) {
+        setAllCategories(data.custom_categories)
+      } else {
+        // Первый запуск — сохраняем дефолтные
+        await supabase.from('settings').upsert({ id: 1, custom_categories: DEFAULT_CATEGORIES })
+        setAllCategories(DEFAULT_CATEGORIES)
+      }
+    } catch {}
+  }
+
+  async function saveCategories(cats) {
+    await supabase.from('settings').upsert({ id: 1, custom_categories: cats })
+    setAllCategories(cats)
+  }
+
+  function addCategory() {
+    const name = newCatName.trim()
+    if (!name) return
+    if (allCategories.includes(name)) {
+      showMsg('❌ Такая категория уже есть', 'error')
+      return
+    }
+    saveCategories([...allCategories, name])
+    setNewCatName('')
+    showMsg('✅ Категория добавлена!')
+  }
+
+  function removeCategory(cat) {
+    const count = products.filter(p => p.category === cat).length
+    const msg = count > 0
+      ? `Удалить «${cat}»? В ней ${count} товаров — им нужно будет назначить другую категорию.`
+      : `Удалить категорию «${cat}»?`
+    if (!confirm(msg)) return
+    saveCategories(allCategories.filter(c => c !== cat))
+    showMsg('🗑 Категория удалена')
   }
 
   async function loadFeatured() {
@@ -353,7 +395,7 @@ export default function Admin() {
             <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['featured','✨ Новинки'],['promo','🏷️ Промокоды'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
+            {[['list','📋 Товары', products.length],['add','➕ Добавить'],['featured','✨ Новинки'],['promo','🏷️ Промокоды'],['cats','📂 Категории'],['settings','⚙️ Настройки']].map(([id,label,count]) => (
               <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
                 style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400 }}>
                 {label}{count !== undefined ? ` (${count})` : ''}
@@ -394,7 +436,7 @@ export default function Admin() {
                 <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по названию..."
                   style={{ flex:1, minWidth:180, padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none' }} />
                 <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{ padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', background:'#fff' }}>
-                  <option>Все</option>{CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                  <option>Все</option>{allCategories.map(c=><option key={c}>{c}</option>)}
                 </select>
                 <span style={{ fontSize:12, color:'#9e8e85' }}>Найдено: {filtered.length}</span>
               </div>
@@ -498,7 +540,7 @@ export default function Admin() {
                         <p style={{ fontSize:13, fontWeight:600, color:'#3a2f2b' }}>{uploading ? '⏳ Загрузка...' : 'Загрузить видео'}</p>
                         <p style={{ fontSize:11, color:'#9e8e85' }}>MP4, до 50 МБ</p>
                       </div>
-                      <input type="file" accept="video/*" onChange={e=>handleVideoUpload(e.target.files[0])} style={{ display:'none' }} />
+                      <input type="file" accept="video/mp4,video/quicktime,video/webm,video/avi,.mp4,.mov,.webm,.avi" onChange={e=>handleVideoUpload(e.target.files[0])} style={{ display:'none' }} />
                     </label>
                   )}
                 </div>
@@ -514,7 +556,7 @@ export default function Admin() {
                     <div>
                       <LB>Категория *</LB>
                       <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={IS}>
-                        {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                        {allCategories.map(c=><option key={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>
@@ -753,6 +795,76 @@ export default function Admin() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+
+          {/* ── Категории ── */}
+          {tab === 'cats' && (
+            <div style={{ maxWidth:780 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:8, color:'#3a2f2b', fontSize:26 }}>📂 Управление категориями</h2>
+              <p style={{ color:'#9e8e85', fontSize:14, marginBottom:28 }}>
+                Добавляйте и удаляйте категории товаров. Базовые категории нельзя удалить.
+              </p>
+
+              {/* Базовые категории */}
+              {/* Добавить */}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:20 }}>
+                <ST>➕ Добавить категорию</ST>
+                <div style={{ display:'flex', gap:10, marginTop:4 }}>
+                  <input
+                    value={newCatName}
+                    onChange={e => setNewCatName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addCategory()}
+                    placeholder="Название категории"
+                    style={{ ...IS, flex:1 }}
+                  />
+                  <button onClick={addCategory} disabled={!newCatName.trim()}
+                    style={{ padding:'10px 22px', background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:14, fontWeight:600, opacity:!newCatName.trim()?0.5:1, whiteSpace:'nowrap' }}>
+                    + Добавить
+                  </button>
+                </div>
+                <p style={{ fontSize:12, color:'#9e8e85', marginTop:8 }}>Нажми Enter или кнопку. Категория сразу появится на сайте и в форме товара.</p>
+              </div>
+
+              {/* Все категории */}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24 }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+                  <ST>📂 Все категории</ST>
+                  <span style={{ fontSize:12, color:'#9e8e85' }}>{allCategories.length} категорий</span>
+                </div>
+                {allCategories.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:'32px 20px', color:'#9e8e85' }}>
+                    <div style={{ fontSize:40, marginBottom:12 }}>📂</div>
+                    <p>Нет категорий. Добавьте первую!</p>
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {allCategories.map((cat, idx) => {
+                      const count = products.filter(p => p.category === cat).length
+                      return (
+                        <div key={cat} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'#fafafa', border:'1.5px solid #ede4dc', borderRadius:10 }}>
+                          <span style={{ fontSize:12, color:'#c9748a', fontWeight:700, minWidth:24, textAlign:'center' }}>#{idx+1}</span>
+                          <div style={{ flex:1 }}>
+                            <div style={{ fontSize:14, fontWeight:600, color:'#3a2f2b' }}>{cat}</div>
+                            <div style={{ fontSize:12, color:'#9e8e85' }}>
+                              {count === 0 ? 'Нет товаров' : `${count} ${count===1?'товар':count<5?'товара':'товаров'}`}
+                            </div>
+                          </div>
+                          <button onClick={() => removeCategory(cat)}
+                            style={{ padding:'6px 14px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, cursor:'pointer', fontSize:12, color:'#c45c5c', fontWeight:600 }}>
+                            🗑 Удалить
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              </div>
+
+
             </div>
           )}
 
