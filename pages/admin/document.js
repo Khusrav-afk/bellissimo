@@ -17,7 +17,7 @@ export default function Document() {
                 k=e.createElement(t),a=e.getElementsByTagName(t)[0],
                 k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
               })(window, document,'script','https://mc.yandex.ru/metrika/tag.js', 'ym');
-              ym(108660110, 'init', {
+              ym(108660854, 'init', {
                 clickmap: true,
                 trackLinks: true,
                 accurateTrackBounce: true,
