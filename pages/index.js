@@ -542,7 +542,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             <ul>
               <li><a href="#" onClick={e=>{e.preventDefault();setSizeChartOpen(true)}}>Размерная сетка</a></li>
               <li><a href="#">Доставка и оплата</a></li>
-              <li><a href="#">Условия продажи</a></li>
+              <li><a href="/rekvizity">Реквизиты</a></li>
               <li><a href="#">FAQ</a></li>
             </ul>
           </div>
@@ -558,7 +558,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           </div>
         </div>
         <div className={styles.fBottom}>
-          <span>© 2026 Bellissimo Lingerie. Все права защищены.</span>
+          <span>© 2026 Bellissimo Lingerie · ИНН 390503901110 · ОГРНИП 324390000042780</span>
           <div className={styles.fPay}><span>МИР</span><span>СБП</span></div>
         </div>
       </footer>
