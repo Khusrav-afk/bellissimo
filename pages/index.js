@@ -19,10 +19,11 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
   const [orderSent, setOrderSent] = useState(false)
   const [promoCode, setPromoCode] = useState('')
-  const [promoResult, setPromoResult] = useState(null) // {discount_type, discount_value, error}
+  const [promoResult, setPromoResult] = useState(null)
   const [promoLoading, setPromoLoading] = useState(false)
   const [lbQty, setLbQty] = useState(1)
   const [wishlistOpen, setWishlistOpen] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState(false) // ← НОВОЕ
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
   const customCats = settings?.custom_categories || []
@@ -149,7 +150,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
       } else if (data.min_order > 0 && cartTotal < data.min_order) {
         setPromoResult({ error: `Промокод «${code}» действует при заказе от ${data.min_order.toLocaleString('ru')} ₽. Добавьте ещё товаров на ${(data.min_order - cartTotal).toLocaleString('ru')} ₽.` })
       } else if (data.categories && data.categories.length > 0) {
-        // Проверяем есть ли в корзине товары нужных категорий
         const hasValidItems = cart.some(item => data.categories.includes(item.category))
         if (!hasValidItems) {
           setPromoResult({ error: `Промокод «${code}» действует только на: ${data.categories.join(', ')}.` })
@@ -181,13 +181,52 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
   }
 
+  // ── ОПЛАТА ЧЕРЕЗ ЮКАССУ ── //
+  async function handlePayment() {
+    if (!orderForm.name || !orderForm.phone || !orderForm.address) {
+      showToast('❌ Заполните имя, телефон и адрес', 'error')
+      return
+    }
+    setPaymentLoading(true)
+    try {
+      const res = await fetch('/api/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: orderForm.name,
+          customerPhone: orderForm.phone,
+          customerEmail: orderForm.email || '',
+          customerAddress: orderForm.address,
+          items: cart.map(x => ({
+            name: x.name,
+            category: x.category,
+            size: x.selectedSize,
+            qty: x.qty,
+            price: x.price
+          })),
+          totalAmount: orderTotal,
+          promoCode: promoResult && !promoResult.error ? promoResult.code : null,
+          discountAmount: promoDiscount
+        })
+      })
+      const data = await res.json()
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl
+      } else {
+        showToast('❌ Ошибка оплаты: ' + (data.error || 'Попробуйте позже'), 'error')
+      }
+    } catch (e) {
+      showToast('❌ Ошибка соединения. Попробуйте позже.', 'error')
+    }
+    setPaymentLoading(false)
+  }
+
   // SVG иконки
   const TgIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
   const VkIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M21.547 7h-3.29a.743.743 0 0 0-.655.392s-1.312 2.416-1.734 3.23C14.734 12.813 14 12.126 14 11.11V7.603A1.104 1.104 0 0 0 12.896 6.5h-2.474a1.982 1.982 0 0 0-1.75.813s1.255-.204 1.255 1.49c0 .42.022 1.626.04 2.64a.73.73 0 0 1-1.272.503 21.54 21.54 0 0 1-2.498-4.543.693.693 0 0 0-.63-.403h-2.99a.508.508 0 0 0-.48.503s1.954 4.76 4.355 7.17C9.77 16.17 12.17 16 12.17 16h1.797a.61.61 0 0 0 .61-.61v-1.03a.61.61 0 0 1 1.03-.443l2.4 2.303a1.123 1.123 0 0 0 .773.307h2.604a.508.508 0 0 0 .48-.503 12.993 12.993 0 0 0-1.88-3.865.073.073 0 0 1 .005-.085A26.974 26.974 0 0 0 22 7.49a.508.508 0 0 0-.453-.49z"/></svg>
   const InstaIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
   const WaIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/></svg>
 
-  // Discount % for product
   function discount(p) {
     if (!p.old_price || p.old_price <= p.price) return 0
     return Math.round((1 - p.price / p.old_price) * 100)
@@ -220,8 +259,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
       {/* ── ШАПКА ── */}
       <header className={styles.header}>
         <div className={styles.hTop}>
-
-          {/* Левая часть: мобильная кнопка + соцсети */}
           <div className={styles.hLeft}>
             <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
               <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -236,13 +273,11 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             </div>
           </div>
 
-          {/* Центр: логотип */}
           <a href="/" className={styles.logo}>
             <span className={styles.logoMain}>Bellissimo</span>
             <span className={styles.logoSub}>Lingerie</span>
           </a>
 
-          {/* Правая часть: поиск + размерная сетка + корзина */}
           <div className={styles.hActions}>
             <button className={styles.hBtn} onClick={() => setSearchOpen(s => !s)} title="Поиск">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
@@ -271,7 +306,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           </div>
         </div>
 
-        {/* Поиск */}
         {searchOpen && (
           <div className={styles.searchBar}>
             <div className={styles.searchInner}>
@@ -313,7 +347,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </header>
 
-      {/* Мобильное меню */}
       {menuOpen && (
         <div className={styles.mobileMenu}>
           <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
@@ -333,7 +366,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       )}
 
-      {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroText}>
           <div className={styles.heroTag}>Коллекция 2026</div>
@@ -349,7 +381,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
-      {/* Бегущая лента новинок */}
       {featuredProducts && featuredProducts.length > 0 && (
         <section className={styles.tickerSection}>
           <div className={styles.tickerSectionHeader}>
@@ -375,7 +406,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </section>
       )}
 
-      {/* Shipping bar */}
       <div className={styles.shippingBar}>
         <p>🚚 Заказы от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> — бесплатно</p>
         <div className={styles.shipDiv}/>
@@ -386,7 +416,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         <p>🔒 Без <strong>возврата</strong></p>
       </div>
 
-      {/* Каталог */}
       <main className={styles.section} id="catalog">
         <div className={styles.sHeader}>
           <h2>{activeCategory==='Все'?'Все товары':activeCategory}</h2>
@@ -415,7 +444,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         )}
       </main>
 
-      {/* Доставка */}
       <section className={styles.section} style={{paddingTop:0}}>
         <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p><div className={styles.dot}/></div>
         <div className={styles.delCards}>
@@ -431,7 +459,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         )}
       </section>
 
-      {/* Преимущества */}
       <section className={styles.trust}>
         <div className={styles.trustGrid}>
           <div className={styles.trustItem}><div className={styles.trustIcon}>🌹</div><h4>Будуарный стиль</h4><p>Изысканное бельё для особых моментов</p></div>
@@ -441,7 +468,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
-      {/* Карта — где нас найти */}
       <section className={styles.mapSection}>
         <div className={styles.mapInner}>
           <div className={styles.mapText}>
@@ -451,27 +477,9 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
               <div className={styles.dot} style={{margin:'12px 0 0'}}/>
             </div>
             <div className={styles.mapDetails}>
-              <div className={styles.mapDetail}>
-                <span>📍</span>
-                <div>
-                  <strong>Адрес</strong>
-                  <p>Калининград, магазин «Европа»</p>
-                </div>
-              </div>
-              <div className={styles.mapDetail}>
-                <span>🏪</span>
-                <div>
-                  <strong>Самовывоз</strong>
-                  <p>Бесплатно · по договорённости</p>
-                </div>
-              </div>
-              <div className={styles.mapDetail}>
-                <span>💬</span>
-                <div>
-                  <strong>Уточнить время</strong>
-                  <p>Напишите нам в WhatsApp перед визитом</p>
-                </div>
-              </div>
+              <div className={styles.mapDetail}><span>📍</span><div><strong>Адрес</strong><p>Калининград, магазин «Европа»</p></div></div>
+              <div className={styles.mapDetail}><span>🏪</span><div><strong>Самовывоз</strong><p>Бесплатно · по договорённости</p></div></div>
+              <div className={styles.mapDetail}><span>💬</span><div><strong>Уточнить время</strong><p>Напишите нам в WhatsApp перед визитом</p></div></div>
             </div>
             <a href="https://wa.me/79114589339?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21+%D0%A5%D0%BE%D1%87%D1%83+%D1%83%D1%82%D0%BE%D1%87%D0%BD%D0%B8%D1%82%D1%8C+%D0%B2%D1%80%D0%B5%D0%BC%D1%8F+%D1%81%D0%B0%D0%BC%D0%BE%D0%B2%D1%8B%D0%B2%D0%BE%D0%B7%D0%B0"
               target="_blank" rel="noreferrer" className={styles.waBtn} style={{marginTop:24,display:'inline-flex'}}>
@@ -481,10 +489,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           <div className={styles.mapFrame}>
             <iframe
               src="https://yandex.ru/map-widget/v1/?ll=20.502663%2C54.717891&z=16&pt=20.502663%2C54.717891%2Cpm2rdm&org=1706976737"
-              width="100%"
-              height="100%"
-              frameBorder="0"
-              allowFullScreen
+              width="100%" height="100%" frameBorder="0" allowFullScreen
               title="Bellissimo Lingerie на карте"
               style={{borderRadius:'var(--radius)',border:'none'}}
             />
@@ -492,7 +497,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
-      {/* WhatsApp баннер */}
       <section className={styles.waBanner}>
         <div className={styles.waInner}>
           <div><h3>Нужна помощь с выбором?</h3><p>Подберём размер, цвет и комплект. Ответим за 5 минут!</p></div>
@@ -500,7 +504,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
-      {/* Соцсети */}
       <section className={styles.socialStrip}>
         <h3>Мы в социальных сетях</h3>
         <p>Следите за новинками и акциями</p>
@@ -512,14 +515,12 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       </section>
 
-      {/* Подписка */}
       <section className={styles.nl}>
         <h2>Будьте в курсе</h2>
         <p>Подпишитесь и получите скидку 10% на первый заказ</p>
         <div className={styles.nlForm}><input type="email" placeholder="Ваш e-mail" /><button>Подписаться</button></div>
       </section>
 
-      {/* Футер */}
       <footer className={styles.footer}>
         <div className={styles.fGrid}>
           <div className={styles.fBrand}>
@@ -615,7 +616,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         )}
       </div>
 
-      {/* ОФОРМЛЕНИЕ */}
+      {/* ОФОРМЛЕНИЕ ЗАКАЗА */}
       {checkoutOpen && (
         <div className={styles.modalOverlay} onClick={() => setCheckoutOpen(false)}>
           <div className={styles.modalBox} onClick={e=>e.stopPropagation()}>
@@ -629,7 +630,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             ) : (
               <>
                 <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Оформление заказа</h3>
-                <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму — свяжемся через WhatsApp</p>
+                <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму и выберите способ оплаты</p>
                 <form onSubmit={submitOrder} style={{display:'flex',flexDirection:'column',gap:14}}>
                   {[['name','Ваше имя *','Анна','text'],['phone','Телефон *','+7 (___) ___-__-__','tel'],['address','Город и адрес *','Москва, ул. Примерная, д. 1','text']].map(([f,l,p,t]) => (
                     <div key={f}>
@@ -643,6 +644,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                     <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
                       style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
                   </div>
+
                   {/* Промокод */}
                   <div>
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Промокод</label>
@@ -666,13 +668,48 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                     {promoResult&&!promoResult.error && <div style={{fontSize:12,color:'#3a7a3a',marginTop:5}}>✅ Промокод «{promoResult.code}» применён! Скидка {promoResult.discount_value}{promoResult.discount_type==='percent'?'%':' ₽'}</div>}
                   </div>
 
+                  {/* Итого */}
                   <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:13}}>
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span></div>
                     {promoDiscount > 0 && <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'#3a7a3a'}}>Скидка ({promoResult.code}):</span><span style={{color:'#3a7a3a',fontWeight:600}}>−{promoDiscount.toLocaleString('ru')} ₽</span></div>}
                     <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Доставка:</span><span style={{color:deliveryCost===0?'#3a7a3a':'inherit'}}>{deliveryCost===0?'Бесплатно':`~${deliveryCost} ₽`}</span></div>
                     <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15,borderTop:'1px solid var(--border)',paddingTop:8,marginTop:4}}><span>Итого:</span><span style={{color:'var(--accent-dark)'}}>{orderTotal.toLocaleString('ru')} ₽</span></div>
                   </div>
-                  <button type="submit" style={{padding:'14px',background:'#25d366',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>💬 Подтвердить через WhatsApp</button>
+
+                  {/* ── КНОПКА ОПЛАТЫ ЮКАССА ── */}
+                  <button
+                    type="button"
+                    onClick={handlePayment}
+                    disabled={paymentLoading}
+                    style={{
+                      padding:'14px',
+                      background: paymentLoading ? '#ccc' : 'linear-gradient(135deg,#c9748a,#a55570)',
+                      color:'#fff',
+                      border:'none',
+                      borderRadius:10,
+                      fontSize:15,
+                      cursor: paymentLoading ? 'not-allowed' : 'pointer',
+                      fontWeight:700,
+                      display:'flex',
+                      alignItems:'center',
+                      justifyContent:'center',
+                      gap:8
+                    }}
+                  >
+                    {paymentLoading ? '⏳ Создаём платёж...' : '💳 Оплатить онлайн ' + orderTotal.toLocaleString('ru') + ' ₽'}
+                  </button>
+
+                  {/* Разделитель */}
+                  <div style={{display:'flex',alignItems:'center',gap:10,color:'var(--muted)',fontSize:12}}>
+                    <div style={{flex:1,height:1,background:'var(--border)'}}/>
+                    <span>или</span>
+                    <div style={{flex:1,height:1,background:'var(--border)'}}/>
+                  </div>
+
+                  {/* WhatsApp кнопка */}
+                  <button type="submit" style={{padding:'14px',background:'#25d366',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                    💬 Подтвердить через WhatsApp
+                  </button>
                 </form>
               </>
             )}
@@ -706,13 +743,11 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         </div>
       )}
 
-      {/* ── УЛУЧШЕННЫЙ ЛАЙТБОКС ── */}
+      {/* ЛАЙТБОКС */}
       {lightbox !== null && (
         <div className={styles.lbOverlay} onClick={closeLightbox}>
           <div className={styles.lbBox} onClick={e=>e.stopPropagation()}>
             <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
-
-            {/* Фото */}
             <div className={styles.lbMain}>
               {lbTotal > 1 && <button className={styles.lbPrev} onClick={e=>{e.stopPropagation();prevMedia()}}>‹</button>}
               {lbIsVideo
@@ -720,8 +755,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                 : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
             </div>
-
-            {/* Миниатюры */}
             {lbTotal > 1 && (
               <div className={styles.lbThumbs}>
                 {lbImgs.map((url,idx) => (
@@ -738,26 +771,17 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                 )}
               </div>
             )}
-
-            {/* Правая панель — улучшенная */}
             <div className={styles.lbInfo}>
-
-              {/* Категория + избранное */}
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                 <div className={styles.lbCat}>{lightbox.product.category}</div>
                 <button onClick={() => toggleWishlist(lightbox.product.id)}
-                  style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:wishlist.includes(lightbox.product.id)?'var(--accent)':'var(--muted)',transition:'all .2s'}}
-                  title={wishlist.includes(lightbox.product.id)?'Убрать из избранного':'В избранное'}>
+                  style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:wishlist.includes(lightbox.product.id)?'var(--accent)':'var(--muted)',transition:'all .2s'}}>
                   <svg viewBox="0 0 24 24" fill={wishlist.includes(lightbox.product.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.5" width="18" height="18">
                     <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
                   </svg>
                 </button>
               </div>
-
-              {/* Название */}
               <div className={styles.lbName}>{lightbox.product.name}</div>
-
-              {/* Цена + скидка */}
               <div className={styles.lbPrices}>
                 <span className={styles.lbPrice}>{lightbox.product.price?.toLocaleString('ru')} ₽</span>
                 {lightbox.product.old_price && (
@@ -769,11 +793,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                   </>
                 )}
               </div>
-
-              {/* Описание */}
               {lightbox.product.description && <p className={styles.lbDesc}>{lightbox.product.description}</p>}
-
-              {/* Размеры */}
               {lightbox.product.sizes?.length > 0 && (
                 <div>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
@@ -790,47 +810,31 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                   </div>
                 </div>
               )}
-
-              {/* Количество */}
               <div>
                 <div style={{fontSize:12,color:'var(--text)',fontWeight:700,letterSpacing:.5,marginBottom:10}}>КОЛИЧЕСТВО:</div>
                 <div style={{display:'flex',alignItems:'center',gap:0,border:'1.5px solid var(--border)',borderRadius:10,overflow:'hidden',width:'fit-content'}}>
-                  <button onClick={() => setLbQty(q => Math.max(1, q-1))}
-                    style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)',transition:'background .2s'}}
-                    onMouseEnter={e=>e.target.style.background='var(--bg2)'}
-                    onMouseLeave={e=>e.target.style.background='none'}>−</button>
+                  <button onClick={() => setLbQty(q => Math.max(1, q-1))} style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>−</button>
                   <span style={{width:44,textAlign:'center',fontSize:15,fontWeight:700,borderLeft:'1px solid var(--border)',borderRight:'1px solid var(--border)',height:40,display:'flex',alignItems:'center',justifyContent:'center'}}>{lbQty}</span>
-                  <button onClick={() => setLbQty(q => q+1)}
-                    style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)',transition:'background .2s'}}
-                    onMouseEnter={e=>e.target.style.background='var(--bg2)'}
-                    onMouseLeave={e=>e.target.style.background='none'}>+</button>
+                  <button onClick={() => setLbQty(q => q+1)} style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>+</button>
                 </div>
               </div>
-
-              {/* Итог и кнопка */}
               <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',color:'var(--muted)'}}>
                   <span>{lbQty} шт × {lightbox.product.price?.toLocaleString('ru')} ₽</span>
                   <strong style={{color:'var(--text)'}}>{(lightbox.product.price * lbQty).toLocaleString('ru')} ₽</strong>
                 </div>
               </div>
-
               <button className={styles.lbAddBtn} onClick={() => { addToCart(lightbox.product, lightbox.selectedSize, lbQty); closeLightbox() }}>
                 + В корзину {lightbox.selectedSize && `(${lightbox.selectedSize})`}
               </button>
-
-              {/* Быстрые факты */}
               <div className={styles.lbFacts}>
                 <div className={styles.lbFact}><span>🚚</span><span>Доставка 2–7 дней по России</span></div>
                 <div className={styles.lbFact}><span>🔒</span><span>Товар не подлежит обмену и возврату</span></div>
                 <div className={styles.lbFact}><span>💳</span><span>Оплата картой МИР</span></div>
               </div>
-
-              {/* WhatsApp вопрос */}
               <a href={`https://wa.me/79114589339?text=${encodeURIComponent(`Здравствуйте! Хочу узнать подробнее о товаре: ${lightbox.product.name}`)}`}
                 target="_blank" rel="noreferrer" className={styles.lbWa}>
-                <WaIcon size={16}/>
-                Задать вопрос о товаре
+                <WaIcon size={16}/>Задать вопрос о товаре
               </a>
             </div>
           </div>
@@ -879,7 +883,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           )}
         </div>
       </div>
-
     </>
   )
 }
@@ -937,7 +940,6 @@ export async function getServerSideProps() {
     const allProducts = productsRes.data || []
     const settings = settingsRes.data || null
     const featuredIds = settings?.featured_ids || []
-    // Новинки: выбранные в админке или товары с is_new
     const featuredProducts = featuredIds.length > 0
       ? allProducts.filter(p => featuredIds.includes(p.id))
       : allProducts.filter(p => p.is_new).slice(0, 10)
