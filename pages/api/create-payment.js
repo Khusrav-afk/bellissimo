@@ -32,25 +32,54 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Ошибка сохранения: ' + error.message })
   }
 
-  // 2. Запрос к ЮКассе
-  const shopId = process.env.YOOKASSA_SHOP_ID
-  const secretKey = process.env.YOOKASSA_SECRET_KEY
+  // 2. Формируем позиции чека
+  const receiptItems = items.map(item => ({
+    description: item.name + (item.size ? ` (${item.size})` : ''),
+    quantity: item.qty,
+    amount: {
+      value: Number(item.price).toFixed(2),
+      currency: 'RUB'
+    },
+    vat_code: 1 // без НДС
+  }))
 
-  console.log('YOOKASSA_SHOP_ID:', shopId ? 'присутствует' : 'ОТСУТСТВУЕТ!')
-  console.log('YOOKASSA_SECRET_KEY:', secretKey ? 'присутствует' : 'ОТСУТСТВУЕТ!')
-  console.log('SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL)
+  // Добавляем доставку если есть
+  const deliveryCost = totalAmount - items.reduce((s, x) => s + x.price * x.qty, 0)
+  if (deliveryCost > 0) {
+    receiptItems.push({
+      description: 'Доставка',
+      quantity: 1,
+      amount: {
+        value: Number(deliveryCost).toFixed(2),
+        currency: 'RUB'
+      },
+      vat_code: 1
+    })
+  }
 
-  const credentials = Buffer.from(`${shopId}:${secretKey}`).toString('base64')
+  // 3. Запрос к ЮКассе
+  const credentials = Buffer.from(
+    `${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_SECRET_KEY}`
+  ).toString('base64')
 
   const paymentBody = {
-    amount: { value: Number(totalAmount).toFixed(2), currency: 'RUB' },
+    amount: {
+      value: Number(totalAmount).toFixed(2),
+      currency: 'RUB'
+    },
     confirmation: {
       type: 'redirect',
       return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?order=${order.id}`
     },
     capture: true,
     description: `Заказ #${order.id.slice(0, 8)}`,
-    metadata: { order_id: order.id }
+    metadata: { order_id: order.id },
+    receipt: {
+      customer: {
+        phone: customerPhone.replace(/\D/g, '').replace(/^8/, '7')
+      },
+      items: receiptItems
+    }
   }
 
   let payment
@@ -79,6 +108,7 @@ export default async function handler(req, res) {
     })
   }
 
+  // 4. Сохраняем payment_id
   await supabase.from('orders').update({
     payment_id: payment.id,
     payment_url: payment.confirmation.confirmation_url
