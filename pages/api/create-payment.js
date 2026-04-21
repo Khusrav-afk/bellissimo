@@ -35,25 +35,30 @@ export default async function handler(req, res) {
   // 2. Формируем позиции чека
   const receiptItems = items.map(item => ({
     description: item.name + (item.size ? ` (${item.size})` : ''),
-    quantity: item.qty,
+    quantity: String(item.qty),
     amount: {
       value: Number(item.price).toFixed(2),
       currency: 'RUB'
     },
-    vat_code: 1 // без НДС
+    vat_code: 1,
+    payment_subject: 'commodity',
+    payment_mode: 'full_payment'
   }))
 
-  // Добавляем доставку если есть
-  const deliveryCost = totalAmount - items.reduce((s, x) => s + x.price * x.qty, 0)
+  // Доставка если есть
+  const itemsSum = items.reduce((s, x) => s + x.price * x.qty, 0)
+  const deliveryCost = totalAmount - itemsSum
   if (deliveryCost > 0) {
     receiptItems.push({
       description: 'Доставка',
-      quantity: 1,
+      quantity: '1',
       amount: {
         value: Number(deliveryCost).toFixed(2),
         currency: 'RUB'
       },
-      vat_code: 1
+      vat_code: 1,
+      payment_subject: 'service',
+      payment_mode: 'full_payment'
     })
   }
 
@@ -61,6 +66,8 @@ export default async function handler(req, res) {
   const credentials = Buffer.from(
     `${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_SECRET_KEY}`
   ).toString('base64')
+
+  const phone = customerPhone.replace(/\D/g, '').replace(/^8/, '7')
 
   const paymentBody = {
     amount: {
@@ -75,9 +82,7 @@ export default async function handler(req, res) {
     description: `Заказ #${order.id.slice(0, 8)}`,
     metadata: { order_id: order.id },
     receipt: {
-      customer: {
-        phone: customerPhone.replace(/\D/g, '').replace(/^8/, '7')
-      },
+      customer: { phone },
       items: receiptItems
     }
   }
@@ -103,7 +108,7 @@ export default async function handler(req, res) {
 
   if (!payment.id || !payment.confirmation) {
     return res.status(500).json({
-      error: payment.description || payment.message || 'Ошибка ЮКассы',
+      error: payment.description || 'Ошибка ЮКассы',
       yookassa_error: payment
     })
   }
