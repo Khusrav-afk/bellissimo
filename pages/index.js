@@ -171,15 +171,35 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
-  function submitOrder(e) {
-    e.preventDefault()
-    const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
-    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
-    window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
-    setOrderSent(true)
-    setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
-  }
+ async function submitOrder(e) {
+  e.preventDefault()
+  const items = cart.map(x => ({
+    name: x.name,
+    category: x.category,
+    size: x.selectedSize,
+    qty: x.qty,
+    price: x.price
+  }))
+  // Сохраняем заказ в Supabase
+  await supabase.from('orders').insert([{
+    customer_name: orderForm.name,
+    customer_phone: orderForm.phone,
+    customer_email: orderForm.email || '',
+    customer_address: orderForm.address,
+    items,
+    total_amount: orderTotal,
+    promo_code: promoResult && !promoResult.error ? promoResult.code : null,
+    discount_amount: promoDiscount || 0,
+    status: 'pending'
+  }])
+  // Открываем WhatsApp
+  const itemsText = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
+  const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
+  const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${itemsText}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
+  window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
+  setOrderSent(true)
+  setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
+}
 
   // ── ОПЛАТА ЧЕРЕЗ ЮКАССУ ── //
   async function handlePayment() {
