@@ -8,24 +8,15 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const {
-    customerName,
-    customerPhone,
-    customerEmail,
-    customerAddress,
-    items,
-    totalAmount,
-    promoCode,
-    discountAmount
-  } = req.body
+  const { customerName, customerPhone, customerEmail, customerAddress, items, totalAmount, promoCode, discountAmount } = req.body
 
-  // 1. Сохраняем заказ в Supabase
+  // 1. Сохраняем заказ
   const { data: order, error } = await supabase
     .from('orders')
     .insert([{
       customer_name: customerName,
       customer_phone: customerPhone,
-      customer_email: customerEmail,
+      customer_email: customerEmail || '',
       customer_address: customerAddress,
       items,
       total_amount: totalAmount,
@@ -36,16 +27,23 @@ export default async function handler(req, res) {
     .select()
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) {
+    console.error('Supabase error:', error)
+    return res.status(500).json({ error: 'Ошибка сохранения: ' + error.message })
+  }
 
-  // 2. Создаём платёж в ЮКассе
-  const idempotenceKey = order.id
+  // 2. Запрос к ЮКассе
+  const shopId = process.env.YOOKASSA_SHOP_ID
+  const secretKey = process.env.YOOKASSA_SECRET_KEY
+
+  console.log('YOOKASSA_SHOP_ID:', shopId ? 'присутствует' : 'ОТСУТСТВУЕТ!')
+  console.log('YOOKASSA_SECRET_KEY:', secretKey ? 'присутствует' : 'ОТСУТСТВУЕТ!')
+  console.log('SITE_URL:', process.env.NEXT_PUBLIC_SITE_URL)
+
+  const credentials = Buffer.from(`${shopId}:${secretKey}`).toString('base64')
 
   const paymentBody = {
-    amount: {
-      value: totalAmount.toFixed(2),
-      currency: 'RUB'
-    },
+    amount: { value: Number(totalAmount).toFixed(2), currency: 'RUB' },
     confirmation: {
       type: 'redirect',
       return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/success?order=${order.id}`
@@ -55,33 +53,37 @@ export default async function handler(req, res) {
     metadata: { order_id: order.id }
   }
 
-  const credentials = Buffer.from(
-    `${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_SECRET_KEY}`
-  ).toString('base64')
-
-  const ykRes = await fetch('https://api.yookassa.ru/v3/payments', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/json',
-      'Idempotence-Key': idempotenceKey
-    },
-    body: JSON.stringify(paymentBody)
-  })
-
-  const payment = await ykRes.json()
-
-  if (!payment.id) {
-    return res.status(500).json({ error: 'ЮКасса не ответила', details: payment })
+  let payment
+  try {
+    const ykRes = await fetch('https://api.yookassa.ru/v3/payments', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+        'Idempotence-Key': order.id
+      },
+      body: JSON.stringify(paymentBody)
+    })
+    payment = await ykRes.json()
+    console.log('YooKassa status:', ykRes.status)
+    console.log('YooKassa response:', JSON.stringify(payment))
+  } catch (e) {
+    console.error('Fetch error:', e)
+    return res.status(500).json({ error: 'Не удалось подключиться к ЮКассе' })
   }
 
-  // 3. Сохраняем payment_id и ссылку в заказ
+  if (!payment.id || !payment.confirmation) {
+    return res.status(500).json({
+      error: payment.description || payment.message || 'Ошибка ЮКассы',
+      yookassa_error: payment
+    })
+  }
+
   await supabase.from('orders').update({
     payment_id: payment.id,
     payment_url: payment.confirmation.confirmation_url
   }).eq('id', order.id)
 
-  // 4. Возвращаем ссылку на оплату
   res.status(200).json({
     paymentUrl: payment.confirmation.confirmation_url,
     orderId: order.id
