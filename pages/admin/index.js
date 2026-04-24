@@ -261,24 +261,34 @@ export default function Admin() {
   }
 
   async function uploadFile(file, folder) {
-    // Конвертируем файл в base64
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = () => reject(new Error('Ошибка чтения файла'))
-      reader.readAsDataURL(file)
-    })
-
-    // Отправляем на сервер → Cloudinary
-    const res = await fetch('/api/cloudinary-upload', {
+    // Шаг 1: получаем подпись с сервера
+    const sigRes = await fetch('/api/cloudinary-upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: base64, folder })
+      body: JSON.stringify({ folder })
     })
+    const { signature, timestamp, apiKey, cloudName, folder: folderPath, error } = await sigRes.json()
+    if (error) throw new Error(error)
 
-    const data = await res.json()
-    if (!data.url) throw new Error(data.error || 'Ошибка загрузки файла')
-    return data.url
+    // Шаг 2: загружаем файл напрямую в Cloudinary с браузера
+    const isVideo = file.type.startsWith('video/')
+    const resourceType = isVideo ? 'video' : 'image'
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('api_key', apiKey)
+    formData.append('timestamp', String(timestamp))
+    formData.append('signature', signature)
+    formData.append('folder', folderPath)
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+      { method: 'POST', body: formData }
+    )
+
+    const data = await uploadRes.json()
+    if (data.secure_url) return data.secure_url
+    throw new Error(data.error?.message || 'Ошибка загрузки в Cloudinary')
   }
 
   async function handlePhotoUpload(files) {
