@@ -18,7 +18,7 @@
 
 ## Шаг 2 — Настрой базу данных
 
-1. В Supabase открой **SQL Editor**
+1. В Supabase открой **SQL Editor** 
 2. Скопируй содержимое файла `supabase-schema.sql`
 3. Нажми **Run** — создастся таблица products
 
