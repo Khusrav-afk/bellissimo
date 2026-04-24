@@ -736,6 +736,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
 
                   {/* Адрес — только для доставки */}
                   {deliveryMethod === 'post' && (
+                  <div>
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Город и адрес *</label>
                     <input
                       type="text"
