@@ -252,7 +252,8 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           })),
           totalAmount: orderTotal,
           promoCode: promoResult && !promoResult.error ? promoResult.code : null,
-          discountAmount: promoDiscount
+          discountAmount: promoDiscount,
+          comment: orderForm.comment || null
         })
       })
       const data = await res.json()
