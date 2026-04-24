@@ -9,7 +9,7 @@
 ---
 
 ## Шаг 1 — Создай аккаунт Supabase (бесплатно)
-
+  
 1. Зайди на https://supabase.com и зарегистрируйся
 2. Создай новый проект (можно назвать bellissimo)
 3. Запомни: **Project URL** и **anon public key** (Settings → API)
