@@ -17,6 +17,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState(null)
   const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
+  const [formErrors, setFormErrors] = useState({})
   const [orderSent, setOrderSent] = useState(false)
   const [promoCode, setPromoCode] = useState('')
   const [promoResult, setPromoResult] = useState(null)
@@ -171,42 +172,65 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
- async function submitOrder(e) {
-  e.preventDefault()
-  const items = cart.map(x => ({
-    name: x.name,
-    category: x.category,
-    size: x.selectedSize,
-    qty: x.qty,
-    price: x.price
-  }))
-  // Сохраняем заказ в Supabase
-  await supabase.from('orders').insert([{
-    customer_name: orderForm.name,
-    customer_phone: orderForm.phone,
-    customer_email: orderForm.email || '',
-    customer_address: orderForm.address,
-    items,
-    total_amount: orderTotal,
-    promo_code: promoResult && !promoResult.error ? promoResult.code : null,
-    discount_amount: promoDiscount || 0,
-    status: 'pending'
-  }])
-  // Открываем WhatsApp
-  const itemsText = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
-  const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
-  const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${itemsText}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
-  window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
-  setOrderSent(true)
-  setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
-}
+  function submitOrder(e) {
+    e.preventDefault()
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
+    setFormErrors({})
+    const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
+    const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
+    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
+    window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
+    setOrderSent(true)
+    setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
+  }
+
+  // ── МАСКА ТЕЛЕФОНА ── //
+  function formatPhone(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11)
+    let d = digits
+    if (d.startsWith('8')) d = '7' + d.slice(1)
+    if (d.startsWith('7') && d.length > 1) {
+      let result = '+7'
+      if (d.length > 1) result += ' (' + d.slice(1, 4)
+      if (d.length >= 4) result += ') ' + d.slice(4, 7)
+      if (d.length >= 7) result += '-' + d.slice(7, 9)
+      if (d.length >= 9) result += '-' + d.slice(9, 11)
+      return result
+    }
+    return value.length ? '+7' : ''
+  }
+
+  function handlePhoneChange(e) {
+    const raw = e.target.value
+    const formatted = formatPhone(raw)
+    setOrderForm(v => ({ ...v, phone: formatted }))
+    setFormErrors(err => ({ ...err, phone: '' }))
+  }
+
+  function validateForm() {
+    const errors = {}
+    if (!orderForm.name.trim() || orderForm.name.trim().length < 2) {
+      errors.name = 'Введите ваше имя (минимум 2 символа)'
+    }
+    const digits = orderForm.phone.replace(/\D/g, '')
+    if (digits.length !== 11) {
+      errors.phone = 'Введите полный номер телефона: +7 (XXX) XXX-XX-XX'
+    }
+    if (!orderForm.address.trim() || orderForm.address.trim().length < 5) {
+      errors.address = 'Введите город и адрес доставки'
+    }
+    return errors
+  }
 
   // ── ОПЛАТА ЧЕРЕЗ ЮКАССУ ── //
   async function handlePayment() {
-    if (!orderForm.name || !orderForm.phone || !orderForm.address) {
-      showToast('❌ Заполните имя, телефон и адрес', 'error')
+    const errors = validateForm()
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
       return
     }
+    setFormErrors({})
     setPaymentLoading(true)
     try {
       const res = await fetch('/api/create-payment', {
@@ -652,16 +676,56 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                 <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Оформление заказа</h3>
                 <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму и выберите способ оплаты</p>
                 <form onSubmit={submitOrder} style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {[['name','Ваше имя *','Анна','text'],['phone','Телефон *','+7 (___) ___-__-__','tel'],['address','Город и адрес *','Москва, ул. Примерная, д. 1','text']].map(([f,l,p,t]) => (
-                    <div key={f}>
-                      <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>{l}</label>
-                      <input type={t} required value={orderForm[f]} onChange={e=>setOrderForm(v=>({...v,[f]:e.target.value}))} placeholder={p}
-                        style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box'}} />
-                    </div>
-                  ))}
+
+                  {/* Имя */}
+                  <div>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Ваше имя *</label>
+                    <input
+                      type="text"
+                      required
+                      value={orderForm.name}
+                      onChange={e => { setOrderForm(v=>({...v,name:e.target.value})); setFormErrors(err=>({...err,name:''})) }}
+                      placeholder="Анна Иванова"
+                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.name?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.name?'#fff8f8':'#fff'}}
+                    />
+                    {formErrors.name && <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.name}</div>}
+                  </div>
+
+                  {/* Телефон с маской */}
+                  <div>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Телефон *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={orderForm.phone}
+                      onChange={handlePhoneChange}
+                      placeholder="+7 (999) 123-45-67"
+                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.phone?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.phone?'#fff8f8':'#fff'}}
+                    />
+                    {formErrors.phone
+                      ? <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.phone}</div>
+                      : <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>Формат: +7 (999) 123-45-67</div>
+                    }
+                  </div>
+
+                  {/* Адрес */}
+                  <div>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Город и адрес *</label>
+                    <input
+                      type="text"
+                      required
+                      value={orderForm.address}
+                      onChange={e => { setOrderForm(v=>({...v,address:e.target.value})); setFormErrors(err=>({...err,address:''})) }}
+                      placeholder="Москва, ул. Примерная, д. 1, кв. 5"
+                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.address?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.address?'#fff8f8':'#fff'}}
+                    />
+                    {formErrors.address && <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.address}</div>}
+                  </div>
+
+                  {/* Комментарий */}
                   <div>
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Комментарий</label>
-                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания..." rows={2}
+                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания по доставке, упаковке..." rows={2}
                       style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
                   </div>
 
