@@ -598,6 +598,12 @@ export default function Admin() {
                                     <button onClick={() => copyText(order.customer_address)}
                                       style={{ padding:'4px 10px', background:'#f0f0f0', border:'none', borderRadius:6, cursor:'pointer', fontSize:12, marginLeft:8, flexShrink:0 }}>📋</button>
                                   </div>
+                                  {order.comment && (
+                                    <div style={{ padding:'10px 12px', background:'#fff8f0', borderRadius:8, border:'1px solid #ede4dc' }}>
+                                      <div style={{ fontSize:11, color:'#9e8e85', marginBottom:4 }}>💬 Комментарий покупателя</div>
+                                      <div style={{ fontSize:14, color:'#3a2f2b', fontStyle:'italic' }}>«{order.comment}»</div>
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Быстрые действия */}
