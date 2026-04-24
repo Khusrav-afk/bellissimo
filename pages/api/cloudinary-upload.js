@@ -20,37 +20,48 @@ export default async function handler(req, res) {
   const apiSecret = process.env.CLOUDINARY_API_SECRET
 
   if (!cloudName || !apiKey || !apiSecret) {
+    console.error('Cloudinary env missing:', { cloudName: !!cloudName, apiKey: !!apiKey, apiSecret: !!apiSecret })
     return res.status(500).json({ error: 'Cloudinary не настроен. Добавьте переменные окружения.' })
   }
 
-  // Определяем тип файла по base64 заголовку
   const isVideo = file.startsWith('data:video/')
   const resourceType = isVideo ? 'video' : 'image'
-
   const timestamp = Math.round(Date.now() / 1000)
   const folderPath = `bellissimo/${folder || 'images'}`
 
-  // Подпись для безопасной загрузки
   const paramsToSign = `folder=${folderPath}&timestamp=${timestamp}`
   const signature = crypto
     .createHash('sha1')
     .update(paramsToSign + apiSecret)
     .digest('hex')
 
-  // Отправляем в Cloudinary
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('api_key', apiKey)
-  formData.append('timestamp', String(timestamp))
-  formData.append('signature', signature)
-  formData.append('folder', folderPath)
+  // Используем URLSearchParams вместо FormData — надёжнее в Node.js
+  const body = new URLSearchParams()
+  body.append('file', file)
+  body.append('api_key', apiKey)
+  body.append('timestamp', String(timestamp))
+  body.append('signature', signature)
+  body.append('folder', folderPath)
 
   try {
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
-      { method: 'POST', body: formData }
+      {
+        method: 'POST',
+        body: body
+      }
     )
-    const data = await response.json()
+
+    const text = await response.text()
+    console.log('Cloudinary raw response:', text.slice(0, 200))
+
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch (e) {
+      console.error('Cloudinary response not JSON:', text.slice(0, 500))
+      return res.status(500).json({ error: 'Cloudinary вернул неверный ответ: ' + text.slice(0, 100) })
+    }
 
     if (data.secure_url) {
       return res.status(200).json({ url: data.secure_url })
@@ -60,6 +71,6 @@ export default async function handler(req, res) {
     }
   } catch (e) {
     console.error('Fetch error:', e)
-    return res.status(500).json({ error: 'Не удалось подключиться к Cloudinary' })
+    return res.status(500).json({ error: 'Не удалось подключиться к Cloudinary: ' + e.message })
   }
 }
