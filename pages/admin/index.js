@@ -2,6 +2,35 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import { supabase } from '../../lib/supabase'
 
+// Адаптивные стили для мобильных
+const mobileStyles = `
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  
+  .admin-header-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .admin-header-btn { padding: 6px 10px !important; font-size: 12px !important; }
+  
+  @media (max-width: 768px) {
+    .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .admin-order-detail-grid { grid-template-columns: 1fr !important; }
+    .admin-form-grid { grid-template-columns: 1fr !important; }
+    .admin-promo-grid { grid-template-columns: 1fr !important; }
+    .admin-header { height: auto !important; padding: 10px 12px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+    .admin-header-nav { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+    .admin-header-nav::-webkit-scrollbar { height: 2px; }
+    .admin-header-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.3); }
+    .admin-content { padding: 12px 8px !important; }
+    .admin-login-box { width: 90% !important; padding: 28px 20px !important; }
+    .admin-order-card-header { flex-wrap: wrap !important; gap: 8px !important; }
+    .admin-modal-box { padding: 16px !important; }
+  }
+  
+  @media (max-width: 480px) {
+    .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .admin-header-btn { padding: 5px 8px !important; font-size: 11px !important; }
+  }
+`
+
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'bellissimo2025'
 const DEFAULT_CATEGORIES = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
 const BUCKET = 'product'
@@ -396,7 +425,7 @@ export default function Admin() {
 
   if (!auth) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', fontFamily:'sans-serif' }}>
-      <div style={{ background:'#fff', padding:48, borderRadius:20, boxShadow:'0 20px 60px rgba(0,0,0,.3)', textAlign:'center', width:360 }}>
+      <div className="admin-login-box" style={{ background:'#fff', padding:48, borderRadius:20, boxShadow:'0 20px 60px rgba(0,0,0,.3)', textAlign:'center', width:360, maxWidth:'92vw' }}>
         <div style={{ fontSize:48, marginBottom:16 }}>🌹</div>
         <h2 style={{ fontFamily:'Georgia,serif', fontStyle:'italic', fontWeight:300, marginBottom:4, color:'#3a2f2b', fontSize:28 }}>Bellissimo</h2>
         <p style={{ color:'#9e8e85', fontSize:13, marginBottom:32, letterSpacing:2, textTransform:'uppercase' }}>Панель управления</p>
@@ -416,17 +445,17 @@ export default function Admin() {
 
   return (
     <>
-      <Head><title>Bellissimo Admin</title></Head>
+      <Head><title>Bellissimo Admin</title><style>{mobileStyles}</style></Head>
       <div style={{ minHeight:'100vh', background:'#f8f4f1', fontFamily:"'Nunito Sans',sans-serif" }}>
 
         {/* Шапка */}
-        <div style={{ background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', color:'#fff', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', height:58, position:'sticky', top:0, zIndex:50, boxShadow:'0 2px 16px rgba(0,0,0,.2)', flexWrap:'wrap', gap:8 }}>
+        <div className="admin-header" style={{ background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', color:'#fff', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', minHeight:58, position:'sticky', top:0, zIndex:50, boxShadow:'0 2px 16px rgba(0,0,0,.2)', flexWrap:'wrap', gap:8 }}>
           <div style={{ fontFamily:'Georgia,serif', fontSize:18 }}>
             <span style={{ color:'#f0c8d2', fontStyle:'italic' }}>Bellissimo</span>
             <span style={{ opacity:.5, margin:'0 8px' }}>|</span>
             <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <div className="admin-header-nav" style={{ display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto' }}>
             {[
               ['orders','📦 Заказы', orders.filter(o=>o.status==='paid').length > 0 ? orders.filter(o=>o.status==='paid').length : undefined],
               ['list','📋 Товары', products.length],
@@ -452,7 +481,7 @@ export default function Admin() {
           </div>
         )}
 
-        <div style={{ maxWidth:1200, margin:'0 auto', padding:'24px 16px' }}>
+        <div className="admin-content" style={{ maxWidth:1200, margin:'0 auto', padding:'24px 16px' }}>
 
           {/* ── ЗАКАЗЫ ── */}
           {tab === 'orders' && (
@@ -465,7 +494,7 @@ export default function Admin() {
               </div>
 
               {/* Статистика */}
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:12, marginBottom:20 }}>
+              <div className="admin-stats-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
                 {[
                   ['Всего заказов', orderStats.total, '📦', '#7c6d9a'],
                   ['Оплачено', orderStats.paid, '✅', '#3a7a3a'],
@@ -564,7 +593,7 @@ export default function Admin() {
                         {/* Раскрытая часть */}
                         {isExpanded && (
                           <div style={{ borderTop:'1px solid #f0e8e0', padding:'20px', background:'#faf8f6' }}>
-                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+                            <div className="admin-order-detail-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
                               
                               {/* Данные покупателя */}
                               <div style={{ background:'#fff', borderRadius:12, padding:16, border:'1px solid #ede4dc' }}>
@@ -707,7 +736,7 @@ export default function Admin() {
           {/* ── Список товаров ── */}
           {tab === 'list' && (
             <div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+              <div className="admin-stats-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
                 {[
                   ['Всего товаров', products.length, '🛍️', '#c9748a'],
                   ['Активных', products.filter(p=>p.active).length, '✅', '#3a7a3a'],
@@ -799,7 +828,7 @@ export default function Admin() {
                 </div>
                 <div>
                   <ST>📝 Основная информация</ST>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <div className="admin-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                     <div style={{ gridColumn:'1/-1' }}>
                       <LB>Название товара *</LB>
                       <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Белый кружевной корсет" style={IS} />
@@ -875,7 +904,7 @@ export default function Admin() {
               <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>🏷️ Промокоды</h2>
               <div style={{background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:24}}>
                 <ST>➕ Создать промокод</ST>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14}}>
+                <div className="admin-promo-grid" style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14}}>
                   <div><LB>Код *</LB><input value={newPromo.code} onChange={e=>setNewPromo(p=>({...p,code:e.target.value.toUpperCase()}))} placeholder="SALE20" style={IS} /></div>
                   <div><LB>Тип *</LB><select value={newPromo.discount_type} onChange={e=>setNewPromo(p=>({...p,discount_type:e.target.value}))} style={IS}><option value="percent">Процент (%)</option><option value="fixed">Фиксированная (₽)</option></select></div>
                   <div><LB>Размер скидки *</LB><input type="number" value={newPromo.discount_value} onChange={e=>setNewPromo(p=>({...p,discount_value:e.target.value}))} style={IS} /></div>
