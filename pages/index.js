@@ -1046,7 +1046,7 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
   const [hovered, setHovered] = useState(false)
   const imgs = product.images || []
   const mainImg = imgs[0] || ''
-  const hoverImg = imgs[1] || imgs[0] || ''
+  const hoverImg = imgs[1] || ''
 
   return (
     <div className={styles.prodCard}>
@@ -1054,8 +1054,41 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onClick={() => onOpen(product)}
-        style={{cursor:'pointer'}}>
-        {mainImg && <img src={hovered && hoverImg ? hoverImg : mainImg} alt={product.name} loading="lazy" />}
+        style={{cursor:'pointer', position:'relative'}}>
+
+        {/* Главное фото */}
+        {mainImg && (
+          <img
+            src={mainImg}
+            alt={product.name}
+            loading="lazy"
+            style={{
+              position: hoverImg ? 'absolute' : 'relative',
+              top:0, left:0, width:'100%', height:'100%',
+              objectFit:'cover', objectPosition:'top',
+              opacity: hovered && hoverImg ? 0 : 1,
+              transition: 'opacity 0.35s ease',
+              display: 'block'
+            }}
+          />
+        )}
+
+        {/* Второе фото (появляется при наведении) */}
+        {hoverImg && (
+          <img
+            src={hoverImg}
+            alt={product.name}
+            loading="lazy"
+            style={{
+              position: 'absolute',
+              top:0, left:0, width:'100%', height:'100%',
+              objectFit:'cover', objectPosition:'top',
+              opacity: hovered ? 1 : 0,
+              transition: 'opacity 0.35s ease',
+              display: 'block'
+            }}
+          />
+        )}
         <div className={styles.prodBadges}>
           {product.is_new && <span className={styles.tagNew}>New</span>}
           {discountPct > 0 && <span className={styles.tagSale}>-{discountPct}%</span>}
