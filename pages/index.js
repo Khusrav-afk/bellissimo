@@ -301,6 +301,10 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         <meta name="twitter:title" content="Bellissimo Lingerie — Нижнее бельё" />
         <meta name="twitter:description" content="Будуарное нижнее бельё с доставкой по России" />
         <link rel="canonical" href="https://www.bellissimolingerie.ru" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Store",
