@@ -24,7 +24,8 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const [promoLoading, setPromoLoading] = useState(false)
   const [lbQty, setLbQty] = useState(1)
   const [wishlistOpen, setWishlistOpen] = useState(false)
-  const [paymentLoading, setPaymentLoading] = useState(false) // ← НОВОЕ
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [deliveryMethod, setDeliveryMethod] = useState('post') // post | pickup
 
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
   const customCats = settings?.custom_categories || []
@@ -38,7 +39,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     : products.filter(p => p.category === activeCategory)
   const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
   const cartCount = cart.reduce((s,x) => s + x.qty, 0)
-  const deliveryCost = cartTotal >= FREE_DELIVERY ? 0 : 350
+  const deliveryCost = deliveryMethod === 'pickup' ? 0 : (cartTotal >= FREE_DELIVERY ? 0 : 350)
   const promoBaseAmount = promoResult && !promoResult.error
     ? (promoResult.categories && promoResult.categories.length > 0
         ? cart.filter(x => promoResult.categories.includes(x.category)).reduce((s,x) => s + x.price * x.qty, 0)
@@ -179,7 +180,8 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     setFormErrors({})
     const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
     const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
-    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nАдрес: ${orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
+    const deliveryLine = deliveryMethod === 'pickup' ? 'Самовывоз в Калининграде (бесплатно)' : (deliveryCost === 0 ? 'Доставка бесплатно' : `~${deliveryCost} ₽`)
+    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nДоставка: ${deliveryLine}\nАдрес: ${deliveryMethod === 'pickup' ? 'Самовывоз' : orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryLine}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
     window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
     setOrderSent(true)
     setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
@@ -217,7 +219,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     if (digits.length !== 11) {
       errors.phone = 'Введите полный номер телефона: +7 (XXX) XXX-XX-XX'
     }
-    if (!orderForm.address.trim() || orderForm.address.trim().length < 5) {
+    if (deliveryMethod === 'post' && (!orderForm.address.trim() || orderForm.address.trim().length < 5)) {
       errors.address = 'Введите город и адрес доставки'
     }
     return errors
@@ -240,7 +242,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           customerName: orderForm.name,
           customerPhone: orderForm.phone,
           customerEmail: orderForm.email || '',
-          customerAddress: orderForm.address,
+          customerAddress: deliveryMethod === 'pickup' ? 'Самовывоз в Калининграде' : orderForm.address,
           items: cart.map(x => ({
             name: x.name,
             category: x.category,
@@ -708,8 +710,32 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                     }
                   </div>
 
-                  {/* Адрес */}
+                  {/* Способ доставки */}
                   <div>
+                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:8}}>Способ доставки *</label>
+                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                      {[
+                        ['post', '🚚', 'Доставка по России', deliveryCost > 0 && deliveryMethod==='post' ? `~${350} ₽` : '🎁 Бесплатно', 'Почта РФ · 5–14 дней'],
+                        ['pickup', '🏪', 'Самовывоз в Калининграде', 'Бесплатно', 'По договорённости'],
+                      ].map(([val, icon, title, price, sub]) => (
+                        <label key={val} onClick={() => setDeliveryMethod(val)}
+                          style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',border:`2px solid ${deliveryMethod===val?'var(--accent)':'var(--border)'}`,borderRadius:10,cursor:'pointer',background:deliveryMethod===val?'#fdf3f5':'#fff',transition:'all .2s'}}>
+                          <div style={{width:20,height:20,borderRadius:'50%',border:`2px solid ${deliveryMethod===val?'var(--accent)':'#ccc'}`,background:deliveryMethod===val?'var(--accent)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                            {deliveryMethod===val && <div style={{width:8,height:8,borderRadius:'50%',background:'#fff'}}/>}
+                          </div>
+                          <span style={{fontSize:20}}>{icon}</span>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b'}}>{title}</div>
+                            <div style={{fontSize:12,color:'var(--muted)'}}>{sub}</div>
+                          </div>
+                          <div style={{fontSize:13,fontWeight:700,color:price==='Бесплатно'||price.includes('🎁')?'#3a7a3a':'#3a2f2b',whiteSpace:'nowrap'}}>{price}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Адрес — только для доставки */}
+                  {deliveryMethod === 'post' && (
                     <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Город и адрес *</label>
                     <input
                       type="text"
@@ -721,6 +747,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                     />
                     {formErrors.address && <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.address}</div>}
                   </div>
+                  )}
 
                   {/* Комментарий */}
                   <div>
