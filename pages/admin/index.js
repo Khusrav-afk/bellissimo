@@ -232,12 +232,24 @@ export default function Admin() {
   }
 
   async function uploadFile(file, folder) {
-    const ext = file.name.split('.').pop().toLowerCase()
-    const filename = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from(BUCKET).upload(filename, file, { cacheControl: '3600', upsert: false, contentType: file.type })
-    if (error) throw new Error(error.message)
-    const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(filename)
-    return publicUrl
+    // Конвертируем файл в base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('Ошибка чтения файла'))
+      reader.readAsDataURL(file)
+    })
+
+    // Отправляем на сервер → Cloudinary
+    const res = await fetch('/api/cloudinary-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: base64, folder })
+    })
+
+    const data = await res.json()
+    if (!data.url) throw new Error(data.error || 'Ошибка загрузки файла')
+    return data.url
   }
 
   async function handlePhotoUpload(files) {
