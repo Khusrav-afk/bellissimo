@@ -281,8 +281,46 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   return (
     <>
       <Head>
-        <title>Bellissimo Lingerie — Будуарное нижнее бельё</title>
-        <meta name="description" content="Интернет-магазин будуарного нижнего белья. Доставка по всей России." />
+        <title>Bellissimo Lingerie — Нижнее бельё в Калининграде, доставка по России</title>
+        <meta name="description" content="Интернет-магазин будуарного нижнего белья Bellissimo в Калининграде. Комплекты, корсеты, пижамы, бюстгальтеры, купальники, халаты, ночные сорочки. Быстрая доставка по всей России от 350 ₽. Самовывоз бесплатно. Оплата картой МИР онлайн." />
+        <meta name="keywords" content="нижнее бельё Калининград, купить нижнее бельё, будуарное бельё, корсет купить Калининград, пижамы Калининград, комплект нижнего белья, красивое нижнее бельё, кружевное бельё, купальники Калининград, халаты женские Калининград, ночные сорочки купить, бельё с доставкой, нижнее бельё онлайн, интернет магазин белья Калининград, бельё недорого, bellissimo lingerie, бюстгальтеры Калининград, трусики женские, чулки Калининград, пояс для чулок, боди женское, корсет кружевной, пижама шёлковая, халат женский, сорочка ночная, нижнее бельё доставка Россия, красивое бельё подарок, бельё для медового месяца, сексуальное нижнее бельё, элитное нижнее бельё, премиальное бельё, бельё оптом Калининград, женское бельё купить онлайн, интернет магазин нижнего белья, доставка белья по России, нижнее бельё недорого с доставкой" />
+        <meta name="robots" content="index, follow" />
+        <meta name="author" content="Bellissimo Lingerie" />
+        <meta name="geo.region" content="RU-KGD" />
+        <meta name="geo.placename" content="Калининград" />
+        <meta name="geo.position" content="54.717891;20.502663" />
+        <meta name="ICBM" content="54.717891, 20.502663" />
+        <meta property="og:title" content="Bellissimo Lingerie — Нижнее бельё с доставкой по России" />
+        <meta property="og:description" content="Будуарное нижнее бельё — комплекты, корсеты, пижамы, купальники. Доставка по всей России. Самовывоз в Калининграде бесплатно." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://www.bellissimolingerie.ru" />
+        <meta property="og:locale" content="ru_RU" />
+        <meta property="og:site_name" content="Bellissimo Lingerie" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Bellissimo Lingerie — Нижнее бельё" />
+        <meta name="twitter:description" content="Будуарное нижнее бельё с доставкой по России" />
+        <link rel="canonical" href="https://www.bellissimolingerie.ru" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Store",
+          "name": "Bellissimo Lingerie",
+          "description": "Интернет-магазин будуарного нижнего белья в Калининграде",
+          "url": "https://www.bellissimolingerie.ru",
+          "telephone": "+79114589339",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "Калининград",
+            "addressCountry": "RU"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 54.717891,
+            "longitude": 20.502663
+          },
+          "openingHours": "Mo-Su 09:00-21:00",
+          "priceRange": "₽₽",
+          "servesCuisine": "Нижнее бельё, lingerie"
+        })}</script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Nunito+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
