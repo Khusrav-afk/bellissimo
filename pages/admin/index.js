@@ -260,7 +260,51 @@ export default function Admin() {
     else showMsg('✅ Настройки сохранены!')
   }
 
+  // Сжимаем изображение перед загрузкой
+  async function compressImage(file, maxSizeMB = 8) {
+    // Если файл меньше лимита — не сжимаем
+    if (file.size < maxSizeMB * 1024 * 1024 && !file.type.startsWith('video/')) {
+      return file
+    }
+    // Видео не сжимаем
+    if (file.type.startsWith('video/')) return file
+
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+
+          // Уменьшаем размер если очень большое
+          const maxDim = 2000
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = Math.round(height * maxDim / width); width = maxDim }
+            else { width = Math.round(width * maxDim / height); height = maxDim }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // Сжимаем с качеством 0.85
+          canvas.toBlob((blob) => {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+          }, 'image/jpeg', 0.85)
+        }
+        img.src = e.target.result
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
   async function uploadFile(file, folder) {
+    // Сжимаем фото перед загрузкой
+    const compressed = await compressImage(file)
+    console.log(`Файл: ${(file.size/1024/1024).toFixed(1)}МБ → ${(compressed.size/1024/1024).toFixed(1)}МБ`)
+
     // Шаг 1: получаем подпись с сервера
     const sigRes = await fetch('/api/cloudinary-upload', {
       method: 'POST',
@@ -275,7 +319,7 @@ export default function Admin() {
     const resourceType = isVideo ? 'video' : 'image'
 
     const formData = new FormData()
-    formData.append('file', file)
+    formData.append('file', isVideo ? file : compressed)
     formData.append('api_key', apiKey)
     formData.append('timestamp', String(timestamp))
     formData.append('signature', signature)
