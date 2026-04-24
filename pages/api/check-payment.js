@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   const { order } = req.query
   if (!order) return res.status(400).json({ status: 'error' })
 
-  // Сначала проверяем статус в нашей базе
+  // Проверяем статус в нашей базе
   const { data, error } = await supabase
     .from('orders')
     .select('status, payment_id')
@@ -18,12 +18,16 @@ export default async function handler(req, res) {
 
   if (error || !data) return res.status(404).json({ status: 'pending' })
 
-  // Если уже paid/shipped/completed — возвращаем сразу
+  // Если уже финальный статус — возвращаем сразу
   if (['paid', 'shipped', 'completed'].includes(data.status)) {
     return res.status(200).json({ status: 'paid' })
   }
 
-  // Если есть payment_id — проверяем актуальный статус в ЮКассе
+  if (data.status === 'canceled') {
+    return res.status(200).json({ status: 'canceled' })
+  }
+
+  // Проверяем актуальный статус в ЮКассе
   if (data.payment_id) {
     try {
       const credentials = Buffer.from(
@@ -34,21 +38,25 @@ export default async function handler(req, res) {
         headers: { 'Authorization': `Basic ${credentials}` }
       })
       const payment = await ykRes.json()
+      console.log('YooKassa payment status:', payment.status)
 
       if (payment.status === 'succeeded') {
-        // Обновляем статус в базе
         await supabase.from('orders').update({ status: 'paid' }).eq('id', order)
         return res.status(200).json({ status: 'paid' })
       }
 
-      if (payment.status === 'canceled') {
+      // Если pending/canceled/waiting_for_capture — клиент вышел не оплатив
+      if (['canceled', 'pending', 'waiting_for_capture'].includes(payment.status)) {
         await supabase.from('orders').update({ status: 'canceled' }).eq('id', order)
         return res.status(200).json({ status: 'canceled' })
       }
+
     } catch (e) {
       console.error('YooKassa check error:', e)
     }
   }
 
-  return res.status(200).json({ status: data.status || 'pending' })
+  // Если нет payment_id или не смогли проверить — тоже отмена
+  await supabase.from('orders').update({ status: 'canceled' }).eq('id', order)
+  return res.status(200).json({ status: 'canceled' })
 }
