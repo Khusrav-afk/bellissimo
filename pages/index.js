@@ -908,38 +908,31 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
               {lbIsVideo
                 ? (() => {
                     const url = lbUrl || ''
-                    // ВКонтакте — vk.com/video или vkvideo.ru
-                    if (url.includes('vk.com/video') || url.includes('vk.com/clip') || url.includes('vkvideo.ru')) {
-                      const match = url.match(/video(-?\d+)_(\d+)/)
-                      if (match) {
-                        const embedUrl = `https://vk.com/video_ext.php?oid=${match[1]}&id=${match[2]}&hd=2&js_api=1`
-                        return (
-                          <iframe
-                            src={embedUrl}
-                            className={styles.lbImg}
-                            style={{border:'none', background:'#000', width:'100%', height:'100%'}}
-                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                            allowFullScreen
-                          />
-                        )
-                      }
-                    }
-                    // YouTube
-                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                      const ytMatch = url.match(/(?:v=|youtu\.be\/)([^&?]+)/)
-                      const videoId = ytMatch ? ytMatch[1] : ''
-                      return (
-                        <iframe
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-                          className={styles.lbImg}
-                          style={{border:'none', background:'#000', width:'100%', height:'100%'}}
-                          allow="autoplay; encrypted-media"
-                          allowFullScreen
-                        />
-                      )
-                    }
-                    // Обычный файл mp4
-                    return <video src={url} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain', background:'#000'}} />
+                    return (
+                      <div className={styles.lbImg} style={{background:'#1a1a2e', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20, padding:32}}>
+                        <div style={{fontSize:64}}>🎬</div>
+                        <div style={{color:'#fff', fontSize:18, fontWeight:600, textAlign:'center', fontFamily:'Georgia,serif'}}>
+                          Видео товара
+                        </div>
+                        <p style={{color:'rgba(255,255,255,.6)', fontSize:14, textAlign:'center', margin:0}}>
+                          Нажмите кнопку чтобы посмотреть видео
+                        </p>
+                        <a href={url} target="_blank" rel="noreferrer"
+                          style={{
+                            display:'flex', alignItems:'center', gap:10,
+                            padding:'14px 28px',
+                            background:'linear-gradient(135deg,#c9748a,#a55570)',
+                            color:'#fff', borderRadius:12,
+                            textDecoration:'none', fontWeight:700, fontSize:16,
+                            boxShadow:'0 4px 20px rgba(201,116,138,.4)'
+                          }}>
+                          ▶ Смотреть видео
+                        </a>
+                        {url.includes('vk') && (
+                          <p style={{color:'rgba(255,255,255,.4)', fontSize:12, margin:0}}>Откроется во ВКонтакте</p>
+                        )}
+                      </div>
+                    )
                   })()
                 : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
