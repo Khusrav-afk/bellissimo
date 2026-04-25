@@ -474,7 +474,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         <section className={styles.tickerSection}>
           <div className={styles.tickerSectionHeader}>
             <div className={styles.tickerSectionTitle}>✨ Новинки</div>
-            <div className={styles.tickerSectionSub}>Нажмите на товар чтобы посмотреть подробнее</div>
+            <div className={styles.tickerSectionSub}>Нажмите на товар, чтобы посмотреть подробнее</div>
           </div>
           <div className={styles.tickerWrap}>
             <div className={styles.tickerTrack}>
@@ -534,11 +534,11 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
       </main>
 
       <section className={styles.section} style={{paddingTop:0}}>
-        <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p><div className={styles.dot}/></div>
+        <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p></div>
         <div className={styles.delCards}>
           <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Стандартная доставка в любую точку России.</p><div className={styles.cost}>{settings?.delivery_cdek || '590 ₽ · 5–14 дней'}</div></div>
           <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Срочная доставка</h4><p>Приоритетная отправка — быстрее обычного.</p><div className={styles.cost}>{settings?.delivery_post || '1 100 ₽ · 2–5 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз в Калининграде</h4><p>Бесплатно — заберите заказ из нашего магазина.</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно'}</div></div>
+          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз в Калининграде</h4><p>Бесплатно — магазин «Старая Европа».</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно'}</div></div>
         </div>
         <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
         {settings?.return_policy && (
@@ -566,7 +566,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
               <div className={styles.dot} style={{margin:'12px 0 0'}}/>
             </div>
             <div className={styles.mapDetails}>
-              <div className={styles.mapDetail}><span>📍</span><div><strong>Адрес</strong><p>Калининград, магазин «Европа»</p></div></div>
+              <div className={styles.mapDetail}><span>📍</span><div><strong>Адрес</strong><p>Калининград, магазин «Старая Европа»</p></div></div>
               <div className={styles.mapDetail}><span>🏪</span><div><strong>Самовывоз</strong><p>Бесплатно · по договорённости</p></div></div>
               <div className={styles.mapDetail}><span>💬</span><div><strong>Уточнить время</strong><p>Напишите нам в WhatsApp перед визитом</p></div></div>
             </div>
@@ -759,7 +759,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                     <div style={{display:'flex',flexDirection:'column',gap:8}}>
                       {[
                         ['post', '🚚', 'Доставка по России', deliveryCost > 0 && deliveryMethod==='post' ? `~${350} ₽` : '🎁 Бесплатно', 'Почта РФ · 5–14 дней'],
-                        ['pickup', '🏪', 'Самовывоз в Калининграде', 'Бесплатно', 'По договорённости'],
+                        ['pickup', '🏪', 'Самовывоз — магазин «Старая Европа»', 'Бесплатно', 'Калининград, по договорённости'],
                       ].map(([val, icon, title, price, sub]) => (
                         <label key={val} onClick={() => setDeliveryMethod(val)}
                           style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',border:`2px solid ${deliveryMethod===val?'var(--accent)':'var(--border)'}`,borderRadius:10,cursor:'pointer',background:deliveryMethod===val?'#fdf3f5':'#fff',transition:'all .2s'}}>
