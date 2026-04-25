@@ -429,6 +429,21 @@ export default function Admin() {
     finally { setLoading(false) }
   }
 
+  async function moveProduct(id, direction) {
+    const idx = filtered.findIndex(p => p.id === id)
+    if (direction === 'up' && idx === 0) return
+    if (direction === 'down' && idx === filtered.length - 1) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    const a = filtered[idx]
+    const b = filtered[swapIdx]
+    // Меняем created_at чтобы поменять порядок
+    const tmpDate = a.created_at
+    await supabase.from('products').update({ created_at: b.created_at }).eq('id', a.id)
+    await supabase.from('products').update({ created_at: tmpDate }).eq('id', b.id)
+    await loadProducts()
+    showMsg('✅ Порядок изменён')
+  }
+
   async function toggleActive(p) {
     const { error } = await supabase.from('products').update({ active: !p.active }).eq('id', p.id)
     if (!error) setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: !x.active } : x))
@@ -844,6 +859,8 @@ export default function Admin() {
                         <button onClick={()=>startEdit(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>✏️</button>
                         <button onClick={()=>duplicateProduct(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>📋</button>
                         <button onClick={()=>toggleActive(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>{p.active?'🙈':'👁'}</button>
+                        <button onClick={()=>moveProduct(p.id, 'up')} title="Переместить вверх" style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>↑</button>
+                        <button onClick={()=>moveProduct(p.id, 'down')} title="Переместить вниз" style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>↓</button>
                         <button onClick={()=>deleteProduct(p.id)} style={{ padding:'5px 9px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>🗑</button>
                       </div>
                     </div>
@@ -929,13 +946,37 @@ export default function Admin() {
                 )}
                 <div>
                   <ST>⚙️ Параметры</ST>
-                  <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+                  <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:14 }}>
                     {[[form.is_new, v=>setForm(f=>({...f,is_new:v})), '🆕 Отметить как «New»'],[form.active, v=>setForm(f=>({...f,active:v})), '👁 Показывать на сайте']].map(([checked, onChange, label], i) => (
                       <label key={i} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, color:'#3a2f2b', padding:'8px 14px', background:checked?'#fdf3f5':'#fafafa', borderRadius:8, border:`1.5px solid ${checked?'#c9748a':'#ede4dc'}` }}>
                         <input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)} style={{ width:15, height:15, accentColor:'#c9748a' }} />
                         {label}
                       </label>
                     ))}
+                  </div>
+                  {/* Ссылка на видео ВКонтакте */}
+                  <div>
+                    <LB>🎬 Ссылка на видео ВКонтакте (необязательно)</LB>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <input
+                        value={form.video_url}
+                        onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))}
+                        placeholder="https://vk.com/video-xxxxxxx_xxxxxxx"
+                        style={{ ...IS, flex:1 }}
+                      />
+                      {form.video_url && (
+                        <button type="button" onClick={() => setForm(f => ({ ...f, video_url: '' }))}
+                          style={{ padding:'10px 14px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, cursor:'pointer', fontSize:12, color:'#c45c5c', whiteSpace:'nowrap' }}>
+                          Удалить
+                        </button>
+                      )}
+                    </div>
+                    {form.video_url && (
+                      <div style={{ marginTop:6, fontSize:12, color:'#3a7a3a' }}>✅ Ссылка добавлена</div>
+                    )}
+                    <div style={{ fontSize:11, color:'#9e8e85', marginTop:4 }}>
+                      ВКонтакте → Видео → Загрузить → настройки «Только по ссылке» → скопируй ссылку
+                    </div>
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:12, paddingTop:8, borderTop:'1px solid #ede4dc' }}>
