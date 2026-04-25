@@ -906,7 +906,41 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             <div className={styles.lbMain}>
               {lbTotal > 1 && <button className={styles.lbPrev} onClick={e=>{e.stopPropagation();prevMedia()}}>‹</button>}
               {lbIsVideo
-                ? <video src={lbUrl} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain',background:'#000'}} />
+                ? (() => {
+                    const url = lbUrl || ''
+                    // ВКонтакте — vk.com/video или vkvideo.ru
+                    if (url.includes('vk.com/video') || url.includes('vk.com/clip') || url.includes('vkvideo.ru')) {
+                      const match = url.match(/video(-?\d+)_(\d+)/)
+                      if (match) {
+                        const embedUrl = `https://vk.com/video_ext.php?oid=${match[1]}&id=${match[2]}&hd=2&js_api=1`
+                        return (
+                          <iframe
+                            src={embedUrl}
+                            className={styles.lbImg}
+                            style={{border:'none', background:'#000', width:'100%', height:'100%'}}
+                            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                            allowFullScreen
+                          />
+                        )
+                      }
+                    }
+                    // YouTube
+                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                      const ytMatch = url.match(/(?:v=|youtu\.be\/)([^&?]+)/)
+                      const videoId = ytMatch ? ytMatch[1] : ''
+                      return (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+                          className={styles.lbImg}
+                          style={{border:'none', background:'#000', width:'100%', height:'100%'}}
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                        />
+                      )
+                    }
+                    // Обычный файл mp4
+                    return <video src={url} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain', background:'#000'}} />
+                  })()
                 : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
             </div>
@@ -921,7 +955,10 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                 {lbHasVideo && (
                   <div className={`${styles.lbThumb} ${lbImgs.length===lightbox.mediaIdx?styles.lbThumbActive:''}`}
                     onClick={e=>{e.stopPropagation();setLightbox(l=>({...l,mediaIdx:lbImgs.length}))}}>
-                    <div style={{width:'100%',height:'100%',background:'#3a2f2b',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:18,borderRadius:6}}>▶</div>
+                    <div style={{width:'100%',height:'100%',background:'#3a2f2b',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:18,borderRadius:6,flexDirection:'column',gap:4}}>
+                      <span>▶</span>
+                      <span style={{fontSize:9,opacity:.7}}>{lightbox?.product.video_url?.includes('vk.com')?'VK':'Видео'}</span>
+                    </div>
                   </div>
                 )}
               </div>
