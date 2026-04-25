@@ -1,1179 +1,1123 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
-import { supabase } from '../lib/supabase'
-import styles from '../styles/Home.module.css'
+import { supabase } from '../../lib/supabase'
+const mobileStyles = `
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  
+  .admin-header-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+  .admin-header-btn { padding: 6px 10px !important; font-size: 12px !important; }
+  
+  @media (max-width: 768px) {
+    .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .admin-order-detail-grid { grid-template-columns: 1fr !important; }
+    .admin-form-grid { grid-template-columns: 1fr !important; }
+    .admin-promo-grid { grid-template-columns: 1fr !important; }
+    .admin-header { height: auto !important; padding: 10px 12px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+    .admin-header-nav { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+    .admin-header-nav::-webkit-scrollbar { height: 2px; }
+    .admin-header-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.3); }
+    .admin-content { padding: 12px 8px !important; }
+    .admin-login-box { width: 90% !important; padding: 28px 20px !important; }
+    .admin-order-card-header { flex-wrap: wrap !important; gap: 8px !important; }
+    .admin-modal-box { padding: 16px !important; }
+  }
+  
+  @media (max-width: 480px) {
+    .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .admin-header-btn { padding: 5px 8px !important; font-size: 11px !important; }
+  }
+`
 
-export default function Home({ initialProducts, settings, featuredProducts }) {
-  const [products] = useState(initialProducts || [])
-  const [cart, setCart] = useState([])
-  const [wishlist, setWishlist] = useState([])
-  const [cartOpen, setCartOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('Все')
-  const [lightbox, setLightbox] = useState(null)
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
-  const [sizeChartOpen, setSizeChartOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [toast, setToast] = useState(null)
-  const [orderForm, setOrderForm] = useState({ name: '', phone: '', address: '', comment: '' })
-  const [formErrors, setFormErrors] = useState({})
-  const [orderSent, setOrderSent] = useState(false)
-  const [promoCode, setPromoCode] = useState('')
-  const [promoResult, setPromoResult] = useState(null)
-  const [promoLoading, setPromoLoading] = useState(false)
-  const [lbQty, setLbQty] = useState(1)
-  const [wishlistOpen, setWishlistOpen] = useState(false)
-  const [paymentLoading, setPaymentLoading] = useState(false)
-  const [deliveryMethod, setDeliveryMethod] = useState('post') // post | pickup
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'bellissimo2025'
+const DEFAULT_CATEGORIES = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
+const BUCKET = 'product'
 
-  const FREE_DELIVERY = settings?.free_delivery_amount || 10000
-  const customCats = settings?.custom_categories || []
-  const baseFallback = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
-  const categories = ['Все', ...(customCats.length > 0 ? customCats : baseFallback), 'Скидки']
-  const searchResults = searchQuery.length > 1
-    ? products.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || p.category?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : []
-  const filtered = activeCategory === 'Все' ? products 
-    : activeCategory === 'Скидки' ? products.filter(p => p.old_price && p.old_price > p.price)
-    : products.filter(p => p.category === activeCategory)
-  const cartTotal = cart.reduce((s,x) => s + x.price * x.qty, 0)
-  const cartCount = cart.reduce((s,x) => s + x.qty, 0)
-  const deliveryCost = deliveryMethod === 'pickup' ? 0 : (cartTotal >= FREE_DELIVERY ? 0 : 350)
-  const promoBaseAmount = promoResult && !promoResult.error
-    ? (promoResult.categories && promoResult.categories.length > 0
-        ? cart.filter(x => promoResult.categories.includes(x.category)).reduce((s,x) => s + x.price * x.qty, 0)
-        : cartTotal)
-    : 0
-  const promoDiscount = promoResult && !promoResult.error
-    ? (promoResult.discount_type === 'percent'
-        ? Math.round(promoBaseAmount * promoResult.discount_value / 100)
-        : Math.min(promoResult.discount_value, promoBaseAmount))
-    : 0
-  const orderTotal = cartTotal - promoDiscount + deliveryCost
-  const leftForFree = FREE_DELIVERY - cartTotal
+const STATUS_LABELS = {
+  pending:   { label: '⏳ Ожидает оплаты', color: '#856404', bg: '#fff3cd', border: '#ffc107' },
+  paid:      { label: '✅ Оплачен',         color: '#155724', bg: '#d4edda', border: '#28a745' },
+  shipped:   { label: '🚚 Отправлен',       color: '#0c5460', bg: '#d1ecf1', border: '#17a2b8' },
+  completed: { label: '🎉 Выполнен',        color: '#3a7a3a', bg: '#edf7ed', border: '#86efac' },
+  canceled:  { label: '❌ Отменён',         color: '#721c24', bg: '#f8d7da', border: '#f5c6cb' },
+}
 
-  const heroImg = settings?.hero_image || products[0]?.images?.[0] || ''
-  const heroTitle = settings?.hero_title || 'Красота, которая ближе к телу'
-  const heroSubtitle = settings?.hero_subtitle || 'Будуарное нижнее бельё для особых моментов'
+export default function Admin() {
+  const [auth, setAuth] = useState(false)
+  const [password, setPassword] = useState('')
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [tab, setTab] = useState('orders')
+  const [editProduct, setEditProduct] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [msg, setMsg] = useState({ text: '', type: '' })
+  const [search, setSearch] = useState('')
+  const [filterCat, setFilterCat] = useState('Все')
+  const [dragIdx, setDragIdx] = useState(null)
+  const [settings, setSettings] = useState({ 
+    hero_title: '', hero_subtitle: '', hero_image: '', free_delivery_amount: 10000,
+    delivery_cdek: 'Почта РФ стандарт · 590 ₽ · 5–14 дней',
+    delivery_post: 'Срочная доставка · 1 100 ₽ · 2–5 дней',
+    delivery_courier: 'Самовывоз в Калининграде · Бесплатно',
+    return_policy: 'Нижнее бельё не подлежит обмену и возврату по санитарным нормам'
+  })
+  const [settingsLoading, setSL] = useState(false)
+  const [promos, setPromos] = useState([])
+  const [promosLoading, setPromosLoading] = useState(false)
+  const [featuredIds, setFeaturedIds] = useState([])
+  const [featuredLoading, setFeaturedLoading] = useState(false)
+  const [newPromo, setNewPromo] = useState({ code: '', discount_type: 'percent', discount_value: '', min_order: '', starts_at: '', expires_at: '', max_uses: '', categories: [] })
+  const [allCategories, setAllCategories] = useState(DEFAULT_CATEGORIES)
+  const [newCatName, setNewCatName] = useState('')
 
-  const lbImgs = lightbox?.product.images || []
-  const lbHasVideo = !!lightbox?.product.video_url
-  const lbTotal = lbImgs.length + (lbHasVideo ? 1 : 0)
-  const lbIdx = lightbox?.mediaIdx || 0
-  const lbIsVideo = lbHasVideo && lbIdx >= lbImgs.length
-  const lbUrl = lbIsVideo ? lightbox?.product.video_url : (lbImgs[lbIdx] || lbImgs[0])
+  // Заказы
+  const [orders, setOrders] = useState([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [orderSearch, setOrderSearch] = useState('')
+  const [orderStatus, setOrderStatus] = useState('all')
+  const [expandedOrder, setExpandedOrder] = useState(null)
+  const [statusUpdating, setStatusUpdating] = useState(null)
 
-  function showToast(text, type = 'default') {
-    setToast({ text, type })
-    setTimeout(() => setToast(null), 2500)
+  const emptyForm = {
+    name: '', category: 'Комплекты', price: '', old_price: '',
+    description: '', sizes: '', sizeStock: {}, is_new: false, active: true,
+    images: [], video_url: ''
+  }
+  const [form, setForm] = useState(emptyForm)
+
+  useEffect(() => { if (auth) { loadProducts(); loadSettings(); loadPromos(); loadFeatured(); loadCategories(); loadOrders() } }, [auth])
+
+  async function loadOrders() {
+    setOrdersLoading(true)
+    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false })
+    if (error) showMsg('Ошибка загрузки заказов: ' + error.message, 'error')
+    setOrders(data || [])
+    setOrdersLoading(false)
   }
 
-  function selectCategory(cat) {
-    setActiveCategory(cat)
-    setTimeout(() => document.getElementById('catalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  async function updateOrderStatus(id, status) {
+    setStatusUpdating(id)
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id)
+    if (!error) {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o))
+      showMsg('✅ Статус обновлён!')
+    } else {
+      showMsg('❌ Ошибка: ' + error.message, 'error')
+    }
+    setStatusUpdating(null)
   }
 
-  function addToCart(product, size, qty = 1) {
-    const key = product.id + (size ? '_' + size : '')
-    setCart(prev => {
-      const ex = prev.find(x => x.key === key)
-      if (ex) return prev.map(x => x.key === key ? {...x, qty: x.qty + qty} : x)
-      return [...prev, {...product, key, selectedSize: size || null, qty}]
-    })
-    showToast(`«${product.name}» добавлен в корзину`, 'success')
-    setCartOpen(true)
+  async function deleteOrder(id) {
+    if (!confirm('Удалить заказ? Это нельзя отменить.')) return
+    const { error } = await supabase.from('orders').delete().eq('id', id)
+    if (!error) {
+      setOrders(prev => prev.filter(o => o.id !== id))
+      showMsg('🗑 Заказ удалён')
+    }
   }
 
-  function toggleWishlist(productId) {
-    setWishlist(prev => {
-      if (prev.includes(productId)) {
-        showToast('Удалено из избранного')
-        return prev.filter(id => id !== productId)
-      } else {
-        showToast('❤️ Добавлено в избранное')
-        return [...prev, productId]
-      }
-    })
+  function copyText(text) {
+    navigator.clipboard.writeText(text)
+    showMsg('📋 Скопировано!')
   }
 
-  function removeFromCart(key) { setCart(prev => prev.filter(x => x.key !== key)) }
+  const filteredOrders = orders.filter(o => {
+    const matchStatus = orderStatus === 'all' || o.status === orderStatus
+    const q = orderSearch.toLowerCase()
+    const matchSearch = !q ||
+      o.customer_name?.toLowerCase().includes(q) ||
+      o.customer_phone?.toLowerCase().includes(q) ||
+      o.customer_address?.toLowerCase().includes(q) ||
+      o.id?.toLowerCase().includes(q)
+    return matchStatus && matchSearch
+  })
 
-  function changeQty(key, delta) {
-    setCart(prev => prev.map(x => {
-      if (x.key !== key) return x
-      const q = x.qty + delta
-      return q < 1 ? null : {...x, qty: q}
-    }).filter(Boolean))
+  const orderStats = {
+    total: orders.length,
+    paid: orders.filter(o => o.status === 'paid').length,
+    pending: orders.filter(o => o.status === 'pending').length,
+    shipped: orders.filter(o => o.status === 'shipped').length,
+    completed: orders.filter(o => o.status === 'completed').length,
+    canceled: orders.filter(o => o.status === 'canceled').length,
+    revenue: orders.filter(o => ['paid','shipped','completed'].includes(o.status)).reduce((s,o) => s + (o.total_amount || 0), 0)
   }
 
-  function openLightbox(product) {
-    setLbQty(1)
-    setLightbox({ product, mediaIdx: 0, selectedSize: product.sizes?.[0] || null })
-    document.body.style.overflow = 'hidden'
+  async function loadProducts() {
+    setLoading(true)
+    const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false })
+    if (error) showMsg('Ошибка загрузки: ' + error.message, 'error')
+    setProducts(data || [])
+    setLoading(false)
   }
 
-  function closeLightbox() { setLightbox(null); document.body.style.overflow = '' }
-
-  function nextMedia() {
-    if (!lightbox || lbTotal <= 1) return
-    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx + 1) % lbTotal}))
-  }
-
-  function prevMedia() {
-    if (!lightbox || lbTotal <= 1) return
-    setLightbox(l => ({...l, mediaIdx: (l.mediaIdx - 1 + lbTotal) % lbTotal}))
-  }
-
-  async function applyPromo() {
-    if (!promoCode.trim()) return
-    setPromoLoading(true)
-    setPromoResult(null)
+  async function loadSettings() {
     try {
-      const code = promoCode.trim().toUpperCase()
-      const { data, error } = await supabase
-        .from('promo_codes')
-        .select('*')
-        .eq('code', code)
-        .single()
+      const { data } = await supabase.from('settings').select('*').eq('id', 1).single()
+      if (data) setSettings(data)
+    } catch {}
+  }
 
-      if (error || !data) {
-        setPromoResult({ error: `Промокод «${code}» не существует. Проверьте правильность написания.` })
-      } else if (!data.active) {
-        setPromoResult({ error: `Промокод «${code}» отключён и не может быть использован.` })
-      } else if (data.starts_at && new Date(data.starts_at) > new Date()) {
-        const startDate = new Date(data.starts_at).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'})
-        setPromoResult({ error: `Промокод «${code}» ещё не действует. Он начнёт работать ${startDate}.` })
-      } else if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        const expDate = new Date(data.expires_at).toLocaleDateString('ru', {day:'numeric',month:'long',year:'numeric'})
-        setPromoResult({ error: `Срок действия промокода «${code}» истёк ${expDate}.` })
-      } else if (data.max_uses > 0 && (data.used_count || 0) >= data.max_uses) {
-        setPromoResult({ error: `Промокод «${code}» уже использован максимальное количество раз (${data.max_uses}).` })
-      } else if (data.min_order > 0 && cartTotal < data.min_order) {
-        setPromoResult({ error: `Промокод «${code}» действует при заказе от ${data.min_order.toLocaleString('ru')} ₽. Добавьте ещё товаров на ${(data.min_order - cartTotal).toLocaleString('ru')} ₽.` })
-      } else if (data.categories && data.categories.length > 0) {
-        const hasValidItems = cart.some(item => data.categories.includes(item.category))
-        if (!hasValidItems) {
-          setPromoResult({ error: `Промокод «${code}» действует только на: ${data.categories.join(', ')}.` })
-        } else {
-          setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id, categories: data.categories })
+  async function loadCategories() {
+    try {
+      const { data } = await supabase.from('settings').select('custom_categories').eq('id', 1).single()
+      if (data?.custom_categories && data.custom_categories.length > 0) {
+        setAllCategories(data.custom_categories)
+      } else {
+        await supabase.from('settings').upsert({ id: 1, custom_categories: DEFAULT_CATEGORIES })
+        setAllCategories(DEFAULT_CATEGORIES)
+      }
+    } catch {}
+  }
+
+  async function saveCategories(cats) {
+    await supabase.from('settings').upsert({ id: 1, custom_categories: cats })
+    setAllCategories(cats)
+  }
+
+  function addCategory() {
+    const name = newCatName.trim()
+    if (!name) return
+    if (allCategories.includes(name)) { showMsg('❌ Такая категория уже есть', 'error'); return }
+    saveCategories([...allCategories, name])
+    setNewCatName('')
+    showMsg('✅ Категория добавлена!')
+  }
+
+  function removeCategory(cat) {
+    const count = products.filter(p => p.category === cat).length
+    const msg = count > 0 ? `Удалить «${cat}»? В ней ${count} товаров.` : `Удалить категорию «${cat}»?`
+    if (!confirm(msg)) return
+    saveCategories(allCategories.filter(c => c !== cat))
+    showMsg('🗑 Категория удалена')
+  }
+
+  async function loadFeatured() {
+    setFeaturedLoading(true)
+    try {
+      const { data } = await supabase.from('settings').select('featured_ids').eq('id', 1).single()
+      setFeaturedIds(data?.featured_ids || [])
+    } catch {}
+    setFeaturedLoading(false)
+  }
+
+  async function saveFeatured(ids) {
+    await supabase.from('settings').upsert({ id: 1, featured_ids: ids })
+    setFeaturedIds(ids)
+    showMsg('✅ Новинки сохранены!')
+  }
+
+  function toggleFeatured(id) {
+    const newIds = featuredIds.includes(id) ? featuredIds.filter(x => x !== id) : [...featuredIds, id]
+    saveFeatured(newIds)
+  }
+
+  async function loadPromos() {
+    setPromosLoading(true)
+    const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false })
+    setPromos(data || [])
+    setPromosLoading(false)
+  }
+
+  async function createPromo() {
+    if (!newPromo.code.trim()) return showMsg('❌ Введите код промокода', 'error')
+    if (!newPromo.discount_value) return showMsg('❌ Введите размер скидки', 'error')
+    const payload = {
+      code: newPromo.code.trim().toUpperCase(),
+      discount_type: newPromo.discount_type,
+      discount_value: Number(newPromo.discount_value),
+      min_order: newPromo.min_order ? Number(newPromo.min_order) : 0,
+      starts_at: newPromo.starts_at || null,
+      expires_at: newPromo.expires_at || null,
+      max_uses: newPromo.max_uses ? Number(newPromo.max_uses) : 0,
+      categories: newPromo.categories || [],
+      active: true, used_count: 0
+    }
+    const { error } = await supabase.from('promo_codes').insert([payload])
+    if (error) return showMsg('❌ Ошибка: ' + error.message, 'error')
+    showMsg('✅ Промокод создан!')
+    setNewPromo({ code: '', discount_type: 'percent', discount_value: '', min_order: '', expires_at: '', active: true })
+    loadPromos()
+  }
+
+  async function togglePromo(id, active) {
+    await supabase.from('promo_codes').update({ active: !active }).eq('id', id)
+    loadPromos()
+  }
+
+  async function deletePromo(id) {
+    if (!confirm('Удалить промокод?')) return
+    await supabase.from('promo_codes').delete().eq('id', id)
+    loadPromos()
+    showMsg('🗑 Промокод удалён')
+  }
+
+  async function saveSettings() {
+    setSL(true)
+    const { error } = await supabase.from('settings').upsert({ id: 1, ...settings })
+    setSL(false)
+    if (error) showMsg('Ошибка: ' + error.message, 'error')
+    else showMsg('✅ Настройки сохранены!')
+  }
+
+  // Сжимаем изображение перед загрузкой
+  async function compressImage(file, maxSizeMB = 8) {
+    // Если файл меньше лимита — не сжимаем
+    if (file.size < maxSizeMB * 1024 * 1024 && !file.type.startsWith('video/')) {
+      return file
+    }
+    // Видео не сжимаем
+    if (file.type.startsWith('video/')) return file
+
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+
+          // Уменьшаем размер если очень большое
+          const maxDim = 2000
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = Math.round(height * maxDim / width); width = maxDim }
+            else { width = Math.round(width * maxDim / height); height = maxDim }
+          }
+
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // Сжимаем с качеством 0.85
+          canvas.toBlob((blob) => {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+          }, 'image/jpeg', 0.85)
         }
-      } else {
-        setPromoResult({ discount_type: data.discount_type, discount_value: data.discount_value, code: data.code, id: data.id, categories: [] })
+        img.src = e.target.result
       }
-    } catch(e) {
-      setPromoResult({ error: 'Не удалось проверить промокод. Попробуйте позже.' })
-    }
-    setPromoLoading(false)
+      reader.readAsDataURL(file)
+    })
   }
 
-  function sendWhatsApp() {
-    const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} = ${(x.price * x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const msg = `Здравствуйте! Хочу заказать:\n${items}\n\nИтого: ${cartTotal.toLocaleString('ru')} ₽\nДоставка: ${deliveryCost === 0 ? 'бесплатно' : '~' + deliveryCost + ' ₽'}`
-    window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
+  async function uploadFile(file, folder) {
+    // Сжимаем фото перед загрузкой
+    const compressed = await compressImage(file)
+    console.log(`Файл: ${(file.size/1024/1024).toFixed(1)}МБ → ${(compressed.size/1024/1024).toFixed(1)}МБ`)
+
+    // Шаг 1: получаем подпись с сервера
+    const sigRes = await fetch('/api/cloudinary-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder })
+    })
+    const { signature, timestamp, apiKey, cloudName, folder: folderPath, error } = await sigRes.json()
+    if (error) throw new Error(error)
+
+    // Шаг 2: загружаем файл напрямую в Cloudinary с браузера
+    const isVideo = file.type.startsWith('video/')
+    const resourceType = isVideo ? 'video' : 'image'
+
+    const formData = new FormData()
+    formData.append('file', isVideo ? file : compressed)
+    formData.append('api_key', apiKey)
+    formData.append('timestamp', String(timestamp))
+    formData.append('signature', signature)
+    formData.append('folder', folderPath)
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+      { method: 'POST', body: formData }
+    )
+
+    const data = await uploadRes.json()
+    if (data.secure_url) return data.secure_url
+    throw new Error(data.error?.message || 'Ошибка загрузки в Cloudinary')
   }
 
-  function submitOrder(e) {
-    e.preventDefault()
-    const errors = validateForm()
-    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
-    setFormErrors({})
-    const items = cart.map(x => `• ${x.name}${x.selectedSize ? ` (${x.selectedSize})` : ''} × ${x.qty} — ${(x.price*x.qty).toLocaleString('ru')} ₽`).join('\n')
-    const promoLine = promoResult && !promoResult.error ? `\nПромокод: ${promoResult.code} (-${promoDiscount.toLocaleString('ru')} ₽)` : ''
-    const deliveryLine = deliveryMethod === 'pickup' ? 'Самовывоз в Калининграде (бесплатно)' : (deliveryCost === 0 ? 'Доставка бесплатно' : `~${deliveryCost} ₽`)
-    const msg = `🛍 НОВЫЙ ЗАКАЗ\n\nПокупатель: ${orderForm.name}\nТелефон: ${orderForm.phone}\nДоставка: ${deliveryLine}\nАдрес: ${deliveryMethod === 'pickup' ? 'Самовывоз' : orderForm.address}\n\nТовары:\n${items}\n\nТовары: ${cartTotal.toLocaleString('ru')} ₽${promoLine}\nДоставка: ${deliveryLine}\nИТОГО: ${orderTotal.toLocaleString('ru')} ₽\n\nКомментарий: ${orderForm.comment || '—'}`
-    window.open(`https://wa.me/79114589339?text=${encodeURIComponent(msg)}`, '_blank')
-    setOrderSent(true)
-    setTimeout(() => { setOrderSent(false); setCheckoutOpen(false); setCart([]) }, 4000)
-  }
-
-  // ── МАСКА ТЕЛЕФОНА ── //
-  function formatPhone(value) {
-    const digits = value.replace(/\D/g, '').slice(0, 11)
-    let d = digits
-    if (d.startsWith('8')) d = '7' + d.slice(1)
-    if (d.startsWith('7') && d.length > 1) {
-      let result = '+7'
-      if (d.length > 1) result += ' (' + d.slice(1, 4)
-      if (d.length >= 4) result += ') ' + d.slice(4, 7)
-      if (d.length >= 7) result += '-' + d.slice(7, 9)
-      if (d.length >= 9) result += '-' + d.slice(9, 11)
-      return result
-    }
-    return value.length ? '+7' : ''
-  }
-
-  function handlePhoneChange(e) {
-    const raw = e.target.value
-    const formatted = formatPhone(raw)
-    setOrderForm(v => ({ ...v, phone: formatted }))
-    setFormErrors(err => ({ ...err, phone: '' }))
-  }
-
-  function validateForm() {
-    const errors = {}
-    if (!orderForm.name.trim() || orderForm.name.trim().length < 2) {
-      errors.name = 'Введите ваше имя (минимум 2 символа)'
-    }
-    const digits = orderForm.phone.replace(/\D/g, '')
-    if (digits.length !== 11) {
-      errors.phone = 'Введите полный номер телефона: +7 (XXX) XXX-XX-XX'
-    }
-    if (deliveryMethod === 'post' && (!orderForm.address.trim() || orderForm.address.trim().length < 5)) {
-      errors.address = 'Введите город и адрес доставки'
-    }
-    return errors
-  }
-
-  // ── ОПЛАТА ЧЕРЕЗ ЮКАССУ ── //
-  async function handlePayment() {
-    const errors = validateForm()
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
-      return
-    }
-    setFormErrors({})
-    setPaymentLoading(true)
-    try {
-      const res = await fetch('/api/create-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName: orderForm.name,
-          customerPhone: orderForm.phone,
-          customerEmail: orderForm.email || '',
-          customerAddress: deliveryMethod === 'pickup' ? 'Самовывоз в Калининграде' : orderForm.address,
-          items: cart.map(x => ({
-            name: x.name,
-            category: x.category,
-            size: x.selectedSize,
-            qty: x.qty,
-            price: x.price
-          })),
-          totalAmount: orderTotal,
-          promoCode: promoResult && !promoResult.error ? promoResult.code : null,
-          discountAmount: promoDiscount,
-          comment: orderForm.comment || null
+  async function handlePhotoUpload(files) {
+    const arr = Array.from(files).slice(0, 5 - form.images.length)
+    if (!arr.length) return
+    setUploading(true)
+    for (const file of arr) {
+      try {
+        const url = await uploadFile(file, 'images')
+        setForm(f => {
+          const imgs = [...f.images, { url, isMain: false }]
+          if (!imgs.some(i => i.isMain)) imgs[0].isMain = true
+          return { ...f, images: imgs }
         })
-      })
-      const data = await res.json()
-      if (data.paymentUrl) {
-        window.location.href = data.paymentUrl
-      } else {
-        showToast('❌ Ошибка оплаты: ' + (data.error || 'Попробуйте позже'), 'error')
-      }
-    } catch (e) {
-      showToast('❌ Ошибка соединения. Попробуйте позже.', 'error')
+      } catch (e) { showMsg('❌ Ошибка загрузки фото: ' + e.message, 'error') }
     }
-    setPaymentLoading(false)
+    setUploading(false)
   }
 
-  // SVG иконки
-  const TgIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.281c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.94z"/></svg>
-  const VkIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M21.547 7h-3.29a.743.743 0 0 0-.655.392s-1.312 2.416-1.734 3.23C14.734 12.813 14 12.126 14 11.11V7.603A1.104 1.104 0 0 0 12.896 6.5h-2.474a1.982 1.982 0 0 0-1.75.813s1.255-.204 1.255 1.49c0 .42.022 1.626.04 2.64a.73.73 0 0 1-1.272.503 21.54 21.54 0 0 1-2.498-4.543.693.693 0 0 0-.63-.403h-2.99a.508.508 0 0 0-.48.503s1.954 4.76 4.355 7.17C9.77 16.17 12.17 16 12.17 16h1.797a.61.61 0 0 0 .61-.61v-1.03a.61.61 0 0 1 1.03-.443l2.4 2.303a1.123 1.123 0 0 0 .773.307h2.604a.508.508 0 0 0 .48-.503 12.993 12.993 0 0 0-1.88-3.865.073.073 0 0 1 .005-.085A26.974 26.974 0 0 0 22 7.49a.508.508 0 0 0-.453-.49z"/></svg>
-  const InstaIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/></svg>
-  const WaIcon = ({size=20}) => <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}><path d="M12 0C5.373 0 0 5.373 0 12c0 2.115.549 4.103 1.516 5.835L0 24l6.318-1.488A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0Zm6.23 16.428c-.262.737-1.536 1.408-2.1 1.46-.569.055-1.104.273-3.71-.773-3.143-1.266-5.155-4.46-5.308-4.67-.152-.21-1.244-1.658-1.244-3.161s.787-2.24 1.066-2.548c.278-.306.608-.383.811-.383.202 0 .405.002.582.01.187.01.438-.07.686.524.256.614.873 2.118.95 2.271.076.153.127.333.025.538-.103.205-.154.333-.305.513-.152.18-.32.402-.457.54-.152.153-.31.319-.133.625.177.306.784 1.292 1.683 2.092 1.155 1.03 2.13 1.347 2.436 1.5.305.152.484.127.662-.076.178-.204.762-.89 1.065-1.194.231-.232.403-.186.684-.07.28.116 1.772.836 2.076.988.305.153.508.23.583.355.077.127.077.737-.184 1.474Z"/></svg>
-
-  function discount(p) {
-    if (!p.old_price || p.old_price <= p.price) return 0
-    return Math.round((1 - p.price / p.old_price) * 100)
+  async function handleVideoUpload(file) {
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadFile(file, 'videos')
+      setForm(f => ({ ...f, video_url: url }))
+      showMsg('✅ Видео загружено!')
+    } catch (e) { showMsg('❌ Ошибка видео: ' + e.message, 'error') }
+    setUploading(false)
   }
+
+  async function handleHeroUpload(file) {
+    if (!file) return
+    setSL(true)
+    try {
+      const url = await uploadFile(file, 'hero')
+      setSettings(s => ({ ...s, hero_image: url }))
+      showMsg('✅ Главное фото загружено!')
+    } catch (e) { showMsg('❌ ' + e.message, 'error') }
+    setSL(false)
+  }
+
+  function removeImage(idx) {
+    setForm(f => {
+      const imgs = f.images.filter((_, i) => i !== idx)
+      if (imgs.length && !imgs.some(i => i.isMain)) imgs[0].isMain = true
+      return { ...f, images: imgs }
+    })
+  }
+
+  function setMainImage(idx) {
+    setForm(f => ({ ...f, images: f.images.map((img, i) => ({ ...img, isMain: i === idx })) }))
+  }
+
+  function handleDragStart(idx) { setDragIdx(idx) }
+  function handleDropImg(e, idx) {
+    e.preventDefault()
+    if (dragIdx === null) return
+    setForm(f => {
+      const imgs = [...f.images]
+      const [moved] = imgs.splice(dragIdx, 1)
+      imgs.splice(idx, 0, moved)
+      return { ...f, images: imgs }
+    })
+    setDragIdx(null)
+  }
+
+  function updateSizeStock(size, value) {
+    setForm(f => ({ ...f, sizeStock: { ...f.sizeStock, [size]: value } }))
+  }
+
+  async function saveProduct() {
+    if (!form.name.trim()) return showMsg('❌ Введите название товара', 'error')
+    if (!form.price) return showMsg('❌ Введите цену', 'error')
+    const sorted = [...form.images].sort((a, b) => b.isMain - a.isMain)
+    const parsedSizes = form.sizes.split(',').map(s => s.trim()).filter(Boolean)
+    const payload = {
+      name: form.name.trim(), category: form.category,
+      price: Number(form.price), old_price: form.old_price ? Number(form.old_price) : null,
+      description: form.description.trim(), sizes: parsedSizes,
+      size_stock: form.sizeStock || {}, images: sorted.map(i => i.url),
+      video_url: form.video_url || null, is_new: form.is_new, active: form.active,
+    }
+    setLoading(true)
+    try {
+      let result
+      if (editProduct) result = await supabase.from('products').update(payload).eq('id', editProduct.id)
+      else result = await supabase.from('products').insert([payload])
+      if (result.error) throw new Error(result.error.message)
+      showMsg(editProduct ? '✅ Товар обновлён!' : '✅ Товар добавлен!')
+      resetForm()
+      await loadProducts()
+      setTab('list')
+    } catch (e) { showMsg('❌ Ошибка: ' + e.message, 'error') }
+    finally { setLoading(false) }
+  }
+
+  async function moveProduct(id, direction) {
+    const idx = filtered.findIndex(p => p.id === id)
+    if (direction === 'up' && idx === 0) return
+    if (direction === 'down' && idx === filtered.length - 1) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    const a = filtered[idx]
+    const b = filtered[swapIdx]
+    // Меняем created_at чтобы поменять порядок
+    const tmpDate = a.created_at
+    await supabase.from('products').update({ created_at: b.created_at }).eq('id', a.id)
+    await supabase.from('products').update({ created_at: tmpDate }).eq('id', b.id)
+    await loadProducts()
+    showMsg('✅ Порядок изменён')
+  }
+
+  async function toggleActive(p) {
+    const { error } = await supabase.from('products').update({ active: !p.active }).eq('id', p.id)
+    if (!error) setProducts(prev => prev.map(x => x.id === p.id ? { ...x, active: !x.active } : x))
+  }
+
+  async function deleteProduct(id) {
+    if (!confirm('Удалить товар?')) return
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (!error) setProducts(prev => prev.filter(x => x.id !== id))
+    showMsg('🗑 Удалено')
+  }
+
+  async function duplicateProduct(p) {
+    const { id, created_at, ...rest } = p
+    const { error } = await supabase.from('products').insert([{ ...rest, name: rest.name + ' (копия)', active: false }])
+    if (!error) { await loadProducts(); showMsg('✅ Продублировано') }
+  }
+
+  function startEdit(p) {
+    setEditProduct(p)
+    const sizes = p.sizes || []
+    const sizeStock = p.size_stock || {}
+    setForm({
+      name: p.name || '', category: p.category || 'Комплекты',
+      price: p.price ? String(p.price) : '', old_price: p.old_price ? String(p.old_price) : '',
+      description: p.description || '', sizes: sizes.join(', '), sizeStock,
+      is_new: p.is_new || false, active: p.active !== false,
+      images: (p.images || []).map((url, i) => ({ url, isMain: i === 0 })),
+      video_url: p.video_url || ''
+    })
+    setTab('add')
+    window.scrollTo(0, 0)
+  }
+
+  function resetForm() { setEditProduct(null); setForm(emptyForm) }
+
+  function showMsg(text, type = 'success') {
+    setMsg({ text, type })
+    setTimeout(() => setMsg({ text: '', type: '' }), 5000)
+  }
+
+  const filtered = products.filter(p =>
+    (filterCat === 'Все' || p.category === filterCat) &&
+    (!search || p.name?.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const parsedSizesForStock = form.sizes.split(',').map(s => s.trim()).filter(Boolean)
+
+  if (!auth) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', fontFamily:'sans-serif' }}>
+      <div className="admin-login-box" style={{ background:'#fff', padding:48, borderRadius:20, boxShadow:'0 20px 60px rgba(0,0,0,.3)', textAlign:'center', width:360, maxWidth:'92vw' }}>
+        <div style={{ fontSize:48, marginBottom:16 }}>🌹</div>
+        <h2 style={{ fontFamily:'Georgia,serif', fontStyle:'italic', fontWeight:300, marginBottom:4, color:'#3a2f2b', fontSize:28 }}>Bellissimo</h2>
+        <p style={{ color:'#9e8e85', fontSize:13, marginBottom:32, letterSpacing:2, textTransform:'uppercase' }}>Панель управления</p>
+        {msg.text && <div style={{ background:'#fef2f2', color:'#c45c5c', padding:10, borderRadius:8, marginBottom:16, fontSize:13 }}>{msg.text}</div>}
+        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Введите пароль"
+          onKeyDown={e => e.key === 'Enter' && (password === ADMIN_PASSWORD ? setAuth(true) : showMsg('❌ Неверный пароль','error'))}
+          style={{ width:'100%', padding:'14px 16px', border:'2px solid #ede4dc', borderRadius:10, fontSize:15, marginBottom:16, outline:'none', boxSizing:'border-box', textAlign:'center', letterSpacing:4 }} />
+        <button onClick={() => password === ADMIN_PASSWORD ? setAuth(true) : showMsg('❌ Неверный пароль','error')}
+          style={{ width:'100%', padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600 }}>
+          Войти
+        </button>
+      </div>
+    </div>
+  )
+
+  const IS = { width:'100%', padding:'10px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', fontFamily:'sans-serif', background:'#fff', color:'#3a2f2b', boxSizing:'border-box' }
 
   return (
     <>
-      <Head>
-        <title>Bellissimo Lingerie — Нижнее бельё в Калининграде, доставка по России</title>
-        <meta name="description" content="Интернет-магазин будуарного нижнего белья Bellissimo в Калининграде. Комплекты, корсеты, пижамы, бюстгальтеры, купальники, халаты, ночные сорочки. Быстрая доставка по всей России от 350 ₽. Самовывоз бесплатно. Оплата картой МИР онлайн." />
-        <meta name="keywords" content="нижнее бельё Калининград, купить нижнее бельё, будуарное бельё, корсет купить Калининград, пижамы Калининград, комплект нижнего белья, красивое нижнее бельё, кружевное бельё, купальники Калининград, халаты женские Калининград, ночные сорочки купить, бельё с доставкой, нижнее бельё онлайн, интернет магазин белья Калининград, бельё недорого, bellissimo lingerie, бюстгальтеры Калининград, трусики женские, чулки Калининград, пояс для чулок, боди женское, корсет кружевной, пижама шёлковая, халат женский, сорочка ночная, нижнее бельё доставка Россия, красивое бельё подарок, бельё для медового месяца, сексуальное нижнее бельё, элитное нижнее бельё, премиальное бельё, бельё оптом Калининград, женское бельё купить онлайн, интернет магазин нижнего белья, доставка белья по России, нижнее бельё недорого с доставкой" />
-        <meta name="robots" content="index, follow" />
-        <meta name="author" content="Bellissimo Lingerie" />
-        <meta name="geo.region" content="RU-KGD" />
-        <meta name="geo.placename" content="Калининград" />
-        <meta name="geo.position" content="54.717891;20.502663" />
-        <meta name="ICBM" content="54.717891, 20.502663" />
-        <meta property="og:title" content="Bellissimo Lingerie — Нижнее бельё с доставкой по России" />
-        <meta property="og:description" content="Будуарное нижнее бельё — комплекты, корсеты, пижамы, купальники. Доставка по всей России. Самовывоз в Калининграде бесплатно." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.bellissimolingerie.ru" />
-        <meta property="og:locale" content="ru_RU" />
-        <meta property="og:site_name" content="Bellissimo Lingerie" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Bellissimo Lingerie — Нижнее бельё" />
-        <meta name="twitter:description" content="Будуарное нижнее бельё с доставкой по России" />
-        <link rel="canonical" href="https://www.bellissimolingerie.ru" />
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <script type="application/ld+json">{JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "Store",
-          "name": "Bellissimo Lingerie",
-          "description": "Интернет-магазин будуарного нижнего белья в Калининграде",
-          "url": "https://www.bellissimolingerie.ru",
-          "telephone": "+79114589339",
-          "address": {
-            "@type": "PostalAddress",
-            "addressLocality": "Калининград",
-            "addressCountry": "RU"
-          },
-          "geo": {
-            "@type": "GeoCoordinates",
-            "latitude": 54.717891,
-            "longitude": 20.502663
-          },
-          "openingHours": "Mo-Su 09:00-21:00",
-          "priceRange": "₽₽",
-          "servesCuisine": "Нижнее бельё, lingerie"
-        })}</script>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,300;0,400;1,300;1,400&family=Nunito+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-      </Head>
+      <Head><title>Bellissimo Admin</title><style>{mobileStyles}</style></Head>
+      <div style={{ minHeight:'100vh', background:'#f8f4f1', fontFamily:"'Nunito Sans',sans-serif" }}>
 
-      {/* Toast */}
-      {toast && <div className={`${styles.toast} ${toast.type === 'success' ? styles.toastSuccess : ''}`}>{toast.text}</div>}
-
-      {/* Плавающий виджет соцсетей СЛЕВА */}
-      <div className={styles.socialFloat}>
-        <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Telegram"><TgIcon /></a>
-        <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="ВКонтакте"><VkIcon /></a>
-        <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.sfBtn} title="Instagram"><InstaIcon /></a>
-        <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.sfBtn} title="WhatsApp"><WaIcon /></a>
-      </div>
-
-      <div className={styles.announce}>
-        🎁 Бесплатная доставка при заказе от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> по всей России
-      </div>
-
-      {/* ── ШАПКА ── */}
-      <header className={styles.header}>
-        <div className={styles.hTop}>
-          <div className={styles.hLeft}>
-            <button className={styles.mobileToggle} onClick={() => setMenuOpen(true)}>
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <line x1="3" y1="6" x2="19" y2="6"/><line x1="3" y1="11" x2="19" y2="11"/><line x1="3" y1="16" x2="19" y2="16"/>
-              </svg>
-            </button>
-            <div className={styles.hSocials}>
-              <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="Telegram"><TgIcon size={18}/></a>
-              <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="ВКонтакте"><VkIcon size={18}/></a>
-              <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="Instagram"><InstaIcon size={18}/></a>
-              <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.hSocBtn} title="WhatsApp"><WaIcon size={18}/></a>
-            </div>
+        {/* Шапка */}
+        <div className="admin-header" style={{ background:'linear-gradient(135deg,#3a2f2b,#5a3a48)', color:'#fff', padding:'0 24px', display:'flex', alignItems:'center', justifyContent:'space-between', minHeight:58, position:'sticky', top:0, zIndex:50, boxShadow:'0 2px 16px rgba(0,0,0,.2)', flexWrap:'wrap', gap:8 }}>
+          <div style={{ fontFamily:'Georgia,serif', fontSize:18 }}>
+            <span style={{ color:'#f0c8d2', fontStyle:'italic' }}>Bellissimo</span>
+            <span style={{ opacity:.5, margin:'0 8px' }}>|</span>
+            <span style={{ fontSize:12, opacity:.7 }}>Admin</span>
           </div>
-
-          <a href="/" className={styles.logo}>
-            <span className={styles.logoMain}>Bellissimo</span>
-            <span className={styles.logoSub}>Lingerie</span>
-          </a>
-
-          <div className={styles.hActions}>
-            <button className={styles.hBtn} onClick={() => setSearchOpen(s => !s)} title="Поиск">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
-                <circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button className={styles.hBtn} onClick={() => setSizeChartOpen(true)} title="Размерная сетка">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
-                <path d="M3 7h18M3 12h18M3 17h18M9 4v3M15 4v3M9 17v3M15 17v3" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button className={styles.hBtn} onClick={() => setWishlistOpen(true)} title="Избранное" style={{position:'relative'}}>
-              <svg viewBox="0 0 24 24" fill={wishlist.length > 0 ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="1.8" width="19" height="19">
-                <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
-              </svg>
-              {wishlist.length > 0 && <span className={styles.badge}>{wishlist.length}</span>}
-            </button>
-            <button className={styles.cartBtn} onClick={() => setCartOpen(true)} title="Корзина">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="19" height="19">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" strokeLinecap="round" strokeLinejoin="round"/>
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <path d="M16 10a4 4 0 01-8 0"/>
-              </svg>
-              {cartCount > 0 && <span className={styles.badge}>{cartCount}</span>}
-            </button>
+          <div className="admin-header-nav" style={{ display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto' }}>
+            {[
+              ['orders','📦 Заказы', orders.filter(o=>o.status==='paid').length > 0 ? orders.filter(o=>o.status==='paid').length : undefined],
+              ['list','📋 Товары', products.length],
+              ['add','➕ Добавить'],
+              ['featured','✨ Новинки'],
+              ['promo','🏷️ Промокоды'],
+              ['cats','📂 Категории'],
+              ['settings','⚙️ Настройки']
+            ].map(([id,label,count]) => (
+              <button key={id} onClick={() => { setTab(id); if(id !== 'add') resetForm() }}
+                style={{ padding:'6px 14px', background:tab===id?'#c9748a':'rgba(255,255,255,.12)', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:tab===id?600:400, position:'relative' }}>
+                {label}
+                {count !== undefined && <span style={{ marginLeft:4, background: id==='orders'?'#ff4757':'rgba(255,255,255,.3)', borderRadius:10, padding:'1px 6px', fontSize:11, fontWeight:700 }}>{count}</span>}
+              </button>
+            ))}
+            <a href="/" target="_blank" style={{ padding:'6px 14px', background:'rgba(255,255,255,.12)', color:'#fff', borderRadius:7, fontSize:13, textDecoration:'none' }}>🌐 Сайт ↗</a>
           </div>
         </div>
 
-        {searchOpen && (
-          <div className={styles.searchBar}>
-            <div className={styles.searchInner}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="18" height="18" style={{flexShrink:0,color:'var(--muted)'}}>
-                <circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5" strokeLinecap="round"/>
-              </svg>
-              <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Поиск по товарам..." className={styles.searchInput} />
-              {searchQuery && <button onClick={() => setSearchQuery('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:18}}>×</button>}
-              <button onClick={() => { setSearchOpen(false); setSearchQuery('') }}
-                style={{background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:13,whiteSpace:'nowrap'}}>Закрыть</button>
+        {msg.text && (
+          <div style={{ background:msg.type==='error'?'#fef2f2':'#edf7ed', color:msg.type==='error'?'#c45c5c':'#3a7a3a', padding:'10px 24px', textAlign:'center', fontWeight:600, fontSize:13, borderBottom:`2px solid ${msg.type==='error'?'#fca5a5':'#86efac'}` }}>
+            {msg.text}
+          </div>
+        )}
+
+        <div className="admin-content" style={{ maxWidth:1200, margin:'0 auto', padding:'24px 16px' }}>
+
+          {/* ── ЗАКАЗЫ ── */}
+          {tab === 'orders' && (
+            <div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 }}>
+                <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, color:'#3a2f2b', fontSize:26, margin:0 }}>📦 Заказы</h2>
+                <button onClick={loadOrders} style={{ padding:'8px 16px', background:'#fff', border:'1.5px solid #ede4dc', borderRadius:8, cursor:'pointer', fontSize:13, color:'#3a2f2b' }}>
+                  🔄 Обновить
+                </button>
+              </div>
+
+              {/* Статистика */}
+              <div className="admin-stats-grid" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
+                {[
+                  ['Всего заказов', orderStats.total, '📦', '#7c6d9a'],
+                  ['Оплачено', orderStats.paid, '✅', '#3a7a3a'],
+                  ['Ожидают', orderStats.pending, '⏳', '#856404'],
+                  ['Отправлено', orderStats.shipped, '🚚', '#0c5460'],
+                  ['Выполнено', orderStats.completed, '🎉', '#c9748a'],
+                  ['Отменено', orderStats.canceled, '❌', '#c45c5c'],
+                ].map(([label,val,icon,color],i) => (
+                  <div key={i} style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:22 }}>{icon}</span>
+                    <div><div style={{ fontSize:20, fontWeight:700, color }}>{val}</div><div style={{ fontSize:11, color:'#9e8e85' }}>{label}</div></div>
+                  </div>
+                ))}
+                <div style={{ background:'linear-gradient(135deg,#c9748a,#a55570)', border:'none', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', gap:10, color:'#fff' }}>
+                  <span style={{ fontSize:22 }}>💰</span>
+                  <div><div style={{ fontSize:18, fontWeight:700 }}>{orderStats.revenue.toLocaleString('ru')} ₽</div><div style={{ fontSize:11, opacity:.8 }}>Выручка</div></div>
+                </div>
+              </div>
+
+              {/* Поиск и фильтр */}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', marginBottom:14, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+                <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="🔍 Поиск по имени, телефону, адресу..."
+                  style={{ flex:1, minWidth:200, padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none' }} />
+                <select value={orderStatus} onChange={e=>setOrderStatus(e.target.value)}
+                  style={{ padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', background:'#fff', cursor:'pointer' }}>
+                  <option value="all">Все статусы</option>
+                  <option value="pending">⏳ Ожидает оплаты</option>
+                  <option value="paid">✅ Оплачен</option>
+                  <option value="shipped">🚚 Отправлен</option>
+                  <option value="completed">🎉 Выполнен</option>
+                  <option value="canceled">❌ Отменён</option>
+                </select>
+                <span style={{ fontSize:12, color:'#9e8e85', whiteSpace:'nowrap' }}>Найдено: {filteredOrders.length}</span>
+              </div>
+
+              {ordersLoading ? (
+                <div style={{ textAlign:'center', padding:48, color:'#9e8e85' }}>⏳ Загрузка заказов...</div>
+              ) : filteredOrders.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'48px 20px', color:'#9e8e85' }}>
+                  <div style={{ fontSize:48, marginBottom:12 }}>📦</div>
+                  <p>Заказов пока нет</p>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  {filteredOrders.map(order => {
+                    const st = STATUS_LABELS[order.status] || STATUS_LABELS.pending
+                    const isExpanded = expandedOrder === order.id
+                    const items = Array.isArray(order.items) ? order.items : []
+                    const date = new Date(order.created_at).toLocaleString('ru', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' })
+
+                    return (
+                      <div key={order.id} style={{ background:'#fff', border:`1.5px solid ${st.border}`, borderRadius:14, overflow:'hidden', transition:'all .2s' }}>
+                        
+                        {/* Шапка заказа */}
+                        <div style={{ padding:'16px 20px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap', cursor:'pointer' }}
+                          onClick={() => setExpandedOrder(isExpanded ? null : order.id)}>
+                          
+                          {/* Номер и дата */}
+                          <div style={{ minWidth:120 }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:'#3a2f2b', fontFamily:'monospace' }}>
+                              #{order.id.slice(0,8).toUpperCase()}
+                            </div>
+                            <div style={{ fontSize:11, color:'#9e8e85', marginTop:2 }}>{date}</div>
+                          </div>
+
+                          {/* Покупатель */}
+                          <div style={{ flex:1, minWidth:150 }}>
+                            <div style={{ fontSize:14, fontWeight:600, color:'#3a2f2b' }}>{order.customer_name || '—'}</div>
+                            <div style={{ fontSize:12, color:'#9e8e85' }}>{order.customer_phone}</div>
+                          </div>
+
+                          {/* Товары краткo */}
+                          <div style={{ flex:2, minWidth:180 }}>
+                            <div style={{ fontSize:12, color:'#9e8e85' }}>
+                              {items.map((x,i) => (
+                                <span key={i}>{x.name}{x.size?` (${x.size})`:''} ×{x.qty}{i<items.length-1?', ':''}</span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Сумма */}
+                          <div style={{ textAlign:'right', minWidth:90 }}>
+                            <div style={{ fontSize:16, fontWeight:700, color:'#c9748a' }}>{order.total_amount?.toLocaleString('ru')} ₽</div>
+                            {order.discount_amount > 0 && <div style={{ fontSize:11, color:'#3a7a3a' }}>скидка -{order.discount_amount?.toLocaleString('ru')} ₽</div>}
+                          </div>
+
+                          {/* Статус */}
+                          <div style={{ padding:'5px 12px', borderRadius:8, fontSize:12, fontWeight:600, background:st.bg, color:st.color, border:`1px solid ${st.border}`, whiteSpace:'nowrap' }}>
+                            {st.label}
+                          </div>
+
+                          {/* Стрелка */}
+                          <div style={{ fontSize:18, color:'#9e8e85', transform:isExpanded?'rotate(180deg)':'rotate(0deg)', transition:'transform .2s' }}>▾</div>
+                        </div>
+
+                        {/* Раскрытая часть */}
+                        {isExpanded && (
+                          <div style={{ borderTop:'1px solid #f0e8e0', padding:'20px', background:'#faf8f6' }}>
+                            <div className="admin-order-detail-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+                              
+                              {/* Данные покупателя */}
+                              <div style={{ background:'#fff', borderRadius:12, padding:16, border:'1px solid #ede4dc' }}>
+                                <div style={{ fontSize:12, fontWeight:700, color:'#9e8e85', letterSpacing:1, textTransform:'uppercase', marginBottom:12 }}>👤 Покупатель</div>
+                                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                    <div>
+                                      <div style={{ fontSize:11, color:'#9e8e85' }}>Имя</div>
+                                      <div style={{ fontSize:14, fontWeight:600 }}>{order.customer_name}</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                    <div>
+                                      <div style={{ fontSize:11, color:'#9e8e85' }}>Телефон</div>
+                                      <div style={{ fontSize:14, fontWeight:600 }}>{order.customer_phone}</div>
+                                    </div>
+                                    <button onClick={() => copyText(order.customer_phone)}
+                                      style={{ padding:'4px 10px', background:'#f0f0f0', border:'none', borderRadius:6, cursor:'pointer', fontSize:12 }}>📋</button>
+                                  </div>
+                                  {order.customer_email && (
+                                    <div>
+                                      <div style={{ fontSize:11, color:'#9e8e85' }}>Email</div>
+                                      <div style={{ fontSize:14 }}>{order.customer_email}</div>
+                                    </div>
+                                  )}
+                                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                                    <div style={{ flex:1 }}>
+                                      <div style={{ fontSize:11, color:'#9e8e85' }}>Адрес доставки</div>
+                                      <div style={{ fontSize:14, fontWeight:600, lineHeight:1.4 }}>{order.customer_address}</div>
+                                    </div>
+                                    <button onClick={() => copyText(order.customer_address)}
+                                      style={{ padding:'4px 10px', background:'#f0f0f0', border:'none', borderRadius:6, cursor:'pointer', fontSize:12, marginLeft:8, flexShrink:0 }}>📋</button>
+                                  </div>
+                                  {order.comment && (
+                                    <div style={{ padding:'10px 12px', background:'#fff8f0', borderRadius:8, border:'1px solid #ede4dc' }}>
+                                      <div style={{ fontSize:11, color:'#9e8e85', marginBottom:4 }}>💬 Комментарий покупателя</div>
+                                      <div style={{ fontSize:14, color:'#3a2f2b', fontStyle:'italic' }}>«{order.comment}»</div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Быстрые действия */}
+                                <div style={{ marginTop:14, display:'flex', gap:8, flexWrap:'wrap' }}>
+                                  <a href={`https://wa.me/${order.customer_phone?.replace(/\D/g,'').replace(/^8/,'7')}`}
+                                    target="_blank" rel="noreferrer"
+                                    style={{ padding:'7px 14px', background:'#25d366', color:'#fff', borderRadius:8, textDecoration:'none', fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+                                    💬 WhatsApp
+                                  </a>
+                                  <a href={`tel:${order.customer_phone}`}
+                                    style={{ padding:'7px 14px', background:'#faf3ed', border:'1px solid #ede4dc', color:'#3a2f2b', borderRadius:8, textDecoration:'none', fontSize:12, fontWeight:600 }}>
+                                    📞 Позвонить
+                                  </a>
+                                </div>
+                              </div>
+
+                              {/* Товары */}
+                              <div style={{ background:'#fff', borderRadius:12, padding:16, border:'1px solid #ede4dc' }}>
+                                <div style={{ fontSize:12, fontWeight:700, color:'#9e8e85', letterSpacing:1, textTransform:'uppercase', marginBottom:12 }}>🛍️ Товары</div>
+                                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                                  {items.map((item, i) => (
+                                    <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', background:'#faf8f6', borderRadius:8 }}>
+                                      <div>
+                                        <div style={{ fontSize:13, fontWeight:600, color:'#3a2f2b' }}>{item.name}</div>
+                                        <div style={{ fontSize:11, color:'#9e8e85', marginTop:2 }}>
+                                          {item.category}
+                                          {item.size && <span style={{ marginLeft:6, padding:'1px 6px', background:'#f0e8e0', borderRadius:4, fontWeight:700 }}>{item.size}</span>}
+                                          <span style={{ marginLeft:6 }}>× {item.qty} шт</span>
+                                        </div>
+                                      </div>
+                                      <div style={{ fontSize:14, fontWeight:700, color:'#c9748a', whiteSpace:'nowrap' }}>
+                                        {(item.price * item.qty).toLocaleString('ru')} ₽
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* Итого */}
+                                <div style={{ marginTop:12, padding:'10px 12px', background:'#fdf3f5', borderRadius:8, border:'1px solid #f0c8d2' }}>
+                                  {order.discount_amount > 0 && (
+                                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'#3a7a3a', marginBottom:4 }}>
+                                      <span>Скидка {order.promo_code && `(${order.promo_code})`}:</span>
+                                      <span>−{order.discount_amount?.toLocaleString('ru')} ₽</span>
+                                    </div>
+                                  )}
+                                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:15, fontWeight:700, color:'#3a2f2b' }}>
+                                    <span>Итого к оплате:</span>
+                                    <span style={{ color:'#c9748a' }}>{order.total_amount?.toLocaleString('ru')} ₽</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Управление статусом */}
+                            <div style={{ background:'#fff', borderRadius:12, padding:16, border:'1px solid #ede4dc' }}>
+                              <div style={{ fontSize:12, fontWeight:700, color:'#9e8e85', letterSpacing:1, textTransform:'uppercase', marginBottom:12 }}>🔄 Изменить статус заказа</div>
+                              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                                {Object.entries(STATUS_LABELS).map(([key, val]) => (
+                                  <button key={key}
+                                    onClick={() => updateOrderStatus(order.id, key)}
+                                    disabled={order.status === key || statusUpdating === order.id}
+                                    style={{
+                                      padding:'8px 16px', borderRadius:8, cursor: order.status === key ? 'default' : 'pointer',
+                                      fontSize:13, fontWeight:600, border:`1.5px solid ${val.border}`,
+                                      background: order.status === key ? val.bg : '#fff',
+                                      color: order.status === key ? val.color : '#9e8e85',
+                                      opacity: statusUpdating === order.id ? .6 : 1
+                                    }}>
+                                    {val.label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {/* payment_id если есть */}
+                              {order.payment_id && (
+                                <div style={{ marginTop:12, fontSize:12, color:'#9e8e85', display:'flex', alignItems:'center', gap:8 }}>
+                                  <span>ID платежа ЮКассы:</span>
+                                  <span style={{ fontFamily:'monospace', color:'#3a2f2b' }}>{order.payment_id}</span>
+                                  <button onClick={() => copyText(order.payment_id)}
+                                    style={{ padding:'2px 8px', background:'#f0f0f0', border:'none', borderRadius:4, cursor:'pointer', fontSize:11 }}>📋</button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Удаление */}
+                            <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end' }}>
+                              <button onClick={() => deleteOrder(order.id)}
+                                style={{ padding:'7px 16px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, cursor:'pointer', fontSize:12, color:'#c45c5c', fontWeight:600 }}>
+                                🗑 Удалить заказ
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-            {searchQuery.length > 1 && (
-              <div className={styles.searchResults}>
-                {searchResults.length === 0 ? (
-                  <div style={{padding:'16px 20px',color:'var(--muted)',fontSize:14}}>Ничего не найдено</div>
-                ) : searchResults.map(p => (
-                  <div key={p.id} className={styles.searchItem} onClick={() => { openLightbox(p); setSearchOpen(false); setSearchQuery('') }}>
-                    {p.images?.[0] && <img src={p.images[0]} alt={p.name} />}
-                    <div>
-                      <div style={{fontSize:14,fontFamily:'Georgia,serif',color:'var(--text)'}}>{p.name}</div>
-                      <div style={{fontSize:12,color:'var(--muted)'}}>{p.category} · {p.price?.toLocaleString('ru')} ₽</div>
-                    </div>
+          )}
+
+          {/* ── Список товаров ── */}
+          {tab === 'list' && (
+            <div>
+              <div className="admin-stats-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+                {[
+                  ['Всего товаров', products.length, '🛍️', '#c9748a'],
+                  ['Активных', products.filter(p=>p.active).length, '✅', '#3a7a3a'],
+                  ['Скрытых', products.filter(p=>!p.active).length, '🙈', '#9e8e85'],
+                  ['Категорий', new Set(products.map(p=>p.category)).size, '📂', '#7c6d9a'],
+                ].map(([label,val,icon,color],i) => (
+                  <div key={i} style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', display:'flex', alignItems:'center', gap:10 }}>
+                    <span style={{ fontSize:24 }}>{icon}</span>
+                    <div><div style={{ fontSize:20, fontWeight:700, color }}>{val}</div><div style={{ fontSize:11, color:'#9e8e85' }}>{label}</div></div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:12, padding:'14px 18px', marginBottom:14, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по названию..."
+                  style={{ flex:1, minWidth:180, padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none' }} />
+                <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{ padding:'8px 14px', border:'1.5px solid #ede4dc', borderRadius:8, fontSize:14, outline:'none', background:'#fff' }}>
+                  <option>Все</option>{allCategories.map(c=><option key={c}>{c}</option>)}
+                </select>
+                <span style={{ fontSize:12, color:'#9e8e85' }}>Найдено: {filtered.length}</span>
+              </div>
+              {loading ? (
+                <div style={{ textAlign:'center', padding:48, color:'#9e8e85' }}>⏳ Загрузка...</div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'48px 20px', color:'#9e8e85' }}>
+                  <div style={{ fontSize:48, marginBottom:12 }}>🛍️</div>
+                  <p style={{ marginBottom:16 }}>Товаров не найдено</p>
+                  <button onClick={()=>{setTab('add');resetForm()}} style={{ padding:'10px 24px', background:'#c9748a', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:14 }}>Добавить товар</button>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                  {filtered.map(p => (
+                    <div key={p.id} style={{ background:'#fff', border:`1.5px solid ${p.active?'#ede4dc':'#fca5a5'}`, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                      <div style={{ width:54, height:70, borderRadius:8, overflow:'hidden', background:'#faf3ed', flexShrink:0, position:'relative' }}>
+                        {p.images?.[0] && <img src={p.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:'Georgia,serif', fontSize:14, marginBottom:3, color:'#3a2f2b', display:'flex', alignItems:'center', gap:6 }}>
+                          {p.is_new && <span style={{ background:'#c9748a', color:'#fff', fontSize:9, padding:'1px 5px', borderRadius:4 }}>NEW</span>}
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize:11, color:'#9e8e85', display:'flex', gap:10, flexWrap:'wrap' }}>
+                          <span>{p.category}</span>
+                          <span style={{ color:'#c9748a', fontWeight:600 }}>{p.price?.toLocaleString('ru')} ₽</span>
+                          {p.sizes?.length > 0 && <span>Размеры: {p.sizes.join(', ')}</span>}
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexShrink:0, flexWrap:'wrap' }}>
+                        <span style={{ padding:'3px 8px', borderRadius:5, fontSize:11, background:p.active?'#edf7ed':'#fef2f2', color:p.active?'#3a7a3a':'#c45c5c', fontWeight:600 }}>
+                          {p.active?'● Активен':'● Скрыт'}
+                        </span>
+                        <button onClick={()=>startEdit(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>✏️</button>
+                        <button onClick={()=>duplicateProduct(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>📋</button>
+                        <button onClick={()=>toggleActive(p)} style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>{p.active?'🙈':'👁'}</button>
+                        <button onClick={()=>moveProduct(p.id, 'up')} title="Переместить вверх" style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>↑</button>
+                        <button onClick={()=>moveProduct(p.id, 'down')} title="Переместить вниз" style={{ padding:'5px 9px', background:'#faf3ed', border:'1px solid #ede4dc', borderRadius:6, cursor:'pointer', fontSize:13 }}>↓</button>
+                        <button onClick={()=>deleteProduct(p.id)} style={{ padding:'5px 9px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-        <div className={styles.nav}>
-          <div className={styles.navInner}>
-            {categories.map(cat => (
-              <button key={cat}
-                className={`${styles.navLink} ${activeCategory===cat?styles.active:''} ${cat==='Скидки'?styles.navLinkSale:''}`}
-                onClick={() => selectCategory(cat)}>{cat}</button>
-            ))}
-          </div>
-        </div>
-      </header>
-
-      {menuOpen && (
-        <div className={styles.mobileMenu}>
-          <button className={styles.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
-          {categories.map(cat => (
-            <button key={cat} className={styles.mobileLink} onClick={() => { selectCategory(cat); setMenuOpen(false) }}>{cat}</button>
-          ))}
-          <div style={{marginTop:'auto',paddingTop:24,borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:10}}>
-            <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer"
-              style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'#f0faf3',borderRadius:10,textDecoration:'none',color:'#2d7a47',fontWeight:600,fontSize:14}}>
-              💬 WhatsApp
-            </a>
-            <button onClick={() => { setSizeChartOpen(true); setMenuOpen(false) }}
-              style={{display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'var(--bg2)',borderRadius:10,border:'none',cursor:'pointer',fontSize:14,textAlign:'left'}}>
-              📏 Размерная сетка
-            </button>
-          </div>
-        </div>
-      )}
-
-      <section className={styles.hero}>
-        <div className={styles.heroText}>
-          <div className={styles.heroTag}>Коллекция 2026</div>
-          <h1>{heroTitle}</h1>
-          <p>{heroSubtitle}</p>
-          <div className={styles.heroBtns}>
-            <a href="#catalog" className={styles.btnFill}>Смотреть каталог</a>
-            <a href="#catalog" className={styles.btnGhost}>Все категории</a>
-          </div>
-        </div>
-        <div className={styles.heroVisual}>
-          {heroImg && <img src={heroImg} alt="Bellissimo Lingerie" loading="eager" />}
-        </div>
-      </section>
-
-      {featuredProducts && featuredProducts.length > 0 && (
-        <section className={styles.tickerSection}>
-          <div className={styles.tickerSectionHeader}>
-            <div className={styles.tickerSectionTitle}>✨ Новинки</div>
-            <div className={styles.tickerSectionSub}>Нажмите на товар, чтобы посмотреть подробнее</div>
-          </div>
-          <div className={styles.tickerWrap}>
-            <div className={styles.tickerTrack}>
-              {[...featuredProducts, ...featuredProducts, ...featuredProducts].map((product, idx) => (
-                <div key={idx} className={styles.tickerItem} onClick={() => openLightbox(product)}>
-                  <div className={styles.tickerImg}>
-                    {product.images?.[0] && <img src={product.images[0]} alt={product.name} loading="lazy" />}
-                    {product.is_new && <span className={styles.tagNew} style={{position:'absolute',top:10,left:10,zIndex:2}}>New</span>}
-                  </div>
-                  <div className={styles.tickerInfo}>
-                    <div className={styles.tickerName}>{product.name}</div>
-                    <div className={styles.tickerPrice}>{product.price?.toLocaleString('ru')} ₽</div>
+          {/* ── Форма добавления ── */}
+          {tab === 'add' && (
+            <div style={{ maxWidth:780 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>
+                {editProduct ? '✏️ Редактировать товар' : '➕ Новый товар'}
+              </h2>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:24 }}>
+                <div>
+                  <ST>📷 Фотографии (до 5 штук)</ST>
+                  <div style={{ display:'flex', gap:10, flexWrap:'wrap', padding:12, background:'#fafafa', borderRadius:12, border:'2px dashed #ede4dc', minHeight:60 }}>
+                    {form.images.map((img, idx) => (
+                      <div key={idx} draggable onDragStart={()=>handleDragStart(idx)} onDragOver={e=>e.preventDefault()} onDrop={e=>handleDropImg(e,idx)}
+                        style={{ position:'relative', width:90, height:120, borderRadius:10, overflow:'hidden', border:`2.5px solid ${img.isMain?'#c9748a':'#ede4dc'}`, cursor:'grab', background:'#f5f5f5', flexShrink:0 }}>
+                        <img src={img.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />
+                        <button onClick={()=>setMainImage(idx)} style={{ position:'absolute', top:3, right:22, width:18, height:18, borderRadius:'50%', background:img.isMain?'#c9748a':'rgba(255,255,255,.8)', border:'none', cursor:'pointer', fontSize:10, display:'flex', alignItems:'center', justifyContent:'center', color:img.isMain?'#fff':'#c9748a' }}>★</button>
+                        <button onClick={()=>removeImage(idx)} style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%', background:'rgba(0,0,0,.65)', color:'#fff', border:'none', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                        {img.isMain && <div style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(201,116,138,.9)', color:'#fff', fontSize:8, textAlign:'center', padding:'2px 0', fontWeight:700 }}>ГЛАВНОЕ</div>}
+                      </div>
+                    ))}
+                    {form.images.length < 5 && (
+                      <label style={{ width:90, height:120, borderRadius:10, border:'2px dashed #ede4dc', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:uploading?'wait':'pointer', color:'#9e8e85', fontSize:11, gap:4, flexShrink:0 }}>
+                        {uploading ? <><span style={{ fontSize:22 }}>⏳</span><span>Загрузка...</span></> : <><span style={{ fontSize:28 }}>+</span><span>Фото</span></>}
+                        <input type="file" accept="image/*" multiple onChange={e=>handlePhotoUpload(e.target.files)} disabled={uploading} style={{ display:'none' }} />
+                      </label>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <div className={styles.shippingBar}>
-        <p>🚚 Заказы от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> — бесплатно</p>
-        <div className={styles.shipDiv}/>
-        <p>💳 Оплата картой <strong>МИР</strong></p>
-        <div className={styles.shipDiv}/>
-        <p>📦 По всей <strong>России</strong></p>
-        <div className={styles.shipDiv}/>
-        <p>🔒 Без <strong>возврата</strong></p>
-      </div>
-
-      <main className={styles.section} id="catalog">
-        <div className={styles.sHeader}>
-          <h2>{activeCategory==='Все'?'Все товары':activeCategory}</h2>
-          <p>{filtered.length} {filtered.length===1?'товар':filtered.length<5?'товара':'товаров'}</p>
-          <div className={styles.dot}/>
-        </div>
-        <div className={styles.catFilter}>
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
-              className={`${styles.catBtn} ${activeCategory===cat?styles.catBtnActive:''} ${cat==='Скидки'&&activeCategory!==cat?styles.catBtnSale:''}`}>{cat}</button>
-          ))}
-        </div>
-        {filtered.length === 0 ? (
-          <div className={styles.empty}><div className={styles.emptyIcon}>🛍️</div><p>В этой категории пока нет товаров</p></div>
-        ) : (
-          <div className={styles.prodGrid}>
-            {filtered.map(product => (
-              <ProductCard key={product.id} product={product}
-                onOpen={openLightbox}
-                isWishlisted={wishlist.includes(product.id)}
-                onWishlist={() => toggleWishlist(product.id)}
-                discountPct={discount(product)}
-              />
-            ))}
-          </div>
-        )}
-      </main>
-
-      <section className={styles.section} style={{paddingTop:0}}>
-        <div className={styles.sHeader}><h2>Доставка и оплата</h2><p>Отправляем по всей России</p></div>
-        <div className={styles.delCards}>
-          <div className={styles.delCard}><div className={styles.di}>✉️</div><h4>Почта России</h4><p>Стандартная доставка в любую точку России.</p><div className={styles.cost}>{settings?.delivery_cdek || '590 ₽ · 5–14 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>⚡</div><h4>Срочная доставка</h4><p>Приоритетная отправка — быстрее обычного.</p><div className={styles.cost}>{settings?.delivery_post || '1 100 ₽ · 2–5 дней'}</div></div>
-          <div className={styles.delCard}><div className={styles.di}>🏪</div><h4>Самовывоз в Калининграде</h4><p>Бесплатно — магазин «Старая Европа».</p><div className={styles.cost}>{settings?.delivery_courier || 'Бесплатно'}</div></div>
-        </div>
-        <div className={styles.delNote}>💳 Оплата картой <strong>МИР</strong> · 🚚 Бесплатно от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong></div>
-        {settings?.return_policy && (
-          <div style={{textAlign:'center',marginTop:12,padding:'12px 20px',background:'#fef8f5',borderRadius:10,fontSize:13,color:'var(--muted)',border:'1px solid #ede4dc'}}>
-            🔒 {settings.return_policy}
-          </div>
-        )}
-      </section>
-
-      <section className={styles.trust}>
-        <div className={styles.trustGrid}>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>🌹</div><h4>Будуарный стиль</h4><p>Изысканное бельё для особых моментов</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>📸</div><h4>Студийные фото</h4><p>Каждый товар — несколько ракурсов и видео</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>🔒</div><h4>Без возврата</h4><p>Нижнее бельё не подлежит обмену и возврату по санитарным нормам</p></div>
-          <div className={styles.trustItem}><div className={styles.trustIcon}>🎁</div><h4>Бережная упаковка</h4><p>Аккуратная упаковка для хрупких тканей</p></div>
-        </div>
-      </section>
-
-      <section className={styles.mapSection}>
-        <div className={styles.mapInner}>
-          <div className={styles.mapText}>
-            <div className={styles.sHeader} style={{textAlign:'left',marginBottom:20}}>
-              <h2>Самовывоз в Калининграде</h2>
-              <p>Заберите заказ бесплатно из нашего магазина</p>
-              <div className={styles.dot} style={{margin:'12px 0 0'}}/>
-            </div>
-            <div className={styles.mapDetails}>
-              <div className={styles.mapDetail}><span>📍</span><div><strong>Адрес</strong><p>Калининград, магазин «Старая Европа»</p></div></div>
-              <div className={styles.mapDetail}><span>🏪</span><div><strong>Самовывоз</strong><p>Бесплатно · по договорённости</p></div></div>
-              <div className={styles.mapDetail}><span>💬</span><div><strong>Уточнить время</strong><p>Напишите нам в WhatsApp перед визитом</p></div></div>
-            </div>
-            <a href="https://wa.me/79114589339?text=%D0%97%D0%B4%D1%80%D0%B0%D0%B2%D1%81%D1%82%D0%B2%D1%83%D0%B9%D1%82%D0%B5%21+%D0%A5%D0%BE%D1%87%D1%83+%D1%83%D1%82%D0%BE%D1%87%D0%BD%D0%B8%D1%82%D1%8C+%D0%B2%D1%80%D0%B5%D0%BC%D1%8F+%D1%81%D0%B0%D0%BC%D0%BE%D0%B2%D1%8B%D0%B2%D0%BE%D0%B7%D0%B0"
-              target="_blank" rel="noreferrer" className={styles.waBtn} style={{marginTop:24,display:'inline-flex'}}>
-              💬 Уточнить время самовывоза
-            </a>
-          </div>
-          <div className={styles.mapFrame}>
-            <iframe
-              src="https://yandex.ru/map-widget/v1/?ll=20.502663%2C54.717891&z=16&pt=20.502663%2C54.717891%2Cpm2rdm&org=1706976737"
-              width="100%" height="100%" frameBorder="0" allowFullScreen
-              title="Bellissimo Lingerie на карте"
-              style={{borderRadius:'var(--radius)',border:'none'}}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.waBanner}>
-        <div className={styles.waInner}>
-          <div><h3>Нужна помощь с выбором?</h3><p>Подберём размер, цвет и комплект. Ответим за 5 минут!</p></div>
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={styles.waBtn}>💬 Написать в WhatsApp</a>
-        </div>
-      </section>
-
-      <section className={styles.socialStrip}>
-        <h3>Мы в социальных сетях</h3>
-        <p>Следите за новинками и акциями</p>
-        <div className={styles.socialIcons}>
-          <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socTg}`}><TgIcon size={18}/>Telegram</a>
-          <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socVk}`}><VkIcon size={18}/>ВКонтакте</a>
-          <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socInst}`}><InstaIcon size={18}/>Instagram</a>
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" className={`${styles.socBtn} ${styles.socWa}`}><WaIcon size={18}/>WhatsApp</a>
-        </div>
-      </section>
-
-      <section className={styles.nl}>
-        <h2>Будьте в курсе</h2>
-        <p>Подпишитесь и получите скидку 10% на первый заказ</p>
-        <div className={styles.nlForm}><input type="email" placeholder="Ваш e-mail" /><button>Подписаться</button></div>
-      </section>
-
-      <footer className={styles.footer}>
-        <div className={styles.fGrid}>
-          <div className={styles.fBrand}>
-            <span className={styles.fLm}>Bellissimo</span>
-            <span className={styles.fLs}>Lingerie</span>
-            <p>Интернет-магазин будуарного нижнего белья. Доставка по всей России.</p>
-            <div className={styles.fSocials}>
-              <a href="https://t.me/bellissimolingerie" target="_blank" rel="noreferrer" title="Telegram"><TgIcon size={16}/></a>
-              <a href="https://vk.ru/bellissimolingerie" target="_blank" rel="noreferrer" title="ВКонтакте"><VkIcon size={16}/></a>
-              <a href="https://instagram.com/bellissimolingerie" target="_blank" rel="noreferrer" title="Instagram"><InstaIcon size={16}/></a>
-              <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer" title="WhatsApp"><WaIcon size={16}/></a>
-            </div>
-          </div>
-          <div>
-            <h5>Каталог</h5>
-            <ul>{categories.filter(c=>c!=='Все').map(c=><li key={c}><a href="#" onClick={e=>{e.preventDefault();selectCategory(c)}}>{c}</a></li>)}</ul>
-          </div>
-          <div>
-            <h5>Покупателям</h5>
-            <ul>
-              <li><a href="#" onClick={e=>{e.preventDefault();setSizeChartOpen(true)}}>Размерная сетка</a></li>
-              <li><a href="#">Доставка и оплата</a></li>
-              <li><a href="/rekvizity">Реквизиты</a></li>
-              <li><a href="#">FAQ</a></li>
-            </ul>
-          </div>
-          <div>
-            <h5>Контакты</h5>
-            <ul>
-              <li><a href="tel:+79114589339">+7 911 458-93-39</a></li>
-              <li><a href="tel:+79062108655">+7 906 210-86-55</a></li>
-              <li><a href="https://t.me/bellissimolingerie">Telegram</a></li>
-              <li><a href="https://wa.me/79114589339">WhatsApp</a></li>
-              <li><a href="https://vk.ru/bellissimolingerie">ВКонтакте</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className={styles.fBottom}>
-          <span>© 2026 Bellissimo Lingerie · ИНН 390503901110 · ОГРНИП 324390000042780</span>
-          <div className={styles.fPay}><span>МИР</span><span>СБП</span></div>
-        </div>
-      </footer>
-
-      {/* КОРЗИНА */}
-      {cartOpen && <div className={styles.cartOverlay} onClick={() => setCartOpen(false)} />}
-      <div className={`${styles.cartSidebar} ${cartOpen ? styles.open : ''}`}>
-        <div className={styles.cartHeader}>
-          <h3>Корзина {cartCount > 0 && <span style={{fontSize:13,color:'var(--muted)',fontWeight:400}}>· {cartCount} шт</span>}</h3>
-          <button onClick={() => setCartOpen(false)}>✕</button>
-        </div>
-        <div className={styles.cartItems}>
-          {cart.length === 0 ? (
-            <div className={styles.cartEmpty}><div>🛍️</div><p>Корзина пуста</p>
-              <button onClick={() => setCartOpen(false)} style={{marginTop:12,padding:'8px 20px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:13}}>Перейти в каталог</button>
-            </div>
-          ) : (
-            <>
-              {cart.map(item => (
-                <div key={item.key} className={styles.cartItem}>
-                  {item.images?.[0] && <img src={item.images[0]} alt={item.name} />}
-                  <div className={styles.cartItemInfo}>
-                    <div className={styles.cartItemName}>{item.name}</div>
-                    <div className={styles.cartItemCat}>{item.category}{item.selectedSize && <span style={{marginLeft:6,padding:'2px 6px',background:'var(--bg2)',borderRadius:4,fontSize:10,fontWeight:600}}>{item.selectedSize}</span>}</div>
-                    <div style={{display:'flex',alignItems:'center',gap:10,marginTop:6}}>
-                      <div style={{display:'flex',alignItems:'center',border:'1px solid var(--border)',borderRadius:6,overflow:'hidden'}}>
-                        <button onClick={() => changeQty(item.key,-1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                        <span style={{width:28,textAlign:'center',fontSize:13,fontWeight:600}}>{item.qty}</span>
-                        <button onClick={() => changeQty(item.key,+1)} style={{width:28,height:28,background:'none',border:'none',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}}>+</button>
-                      </div>
-                      <div className={styles.cartItemPrice}>{(item.price*item.qty).toLocaleString('ru')} ₽</div>
+                <div>
+                  <ST>📝 Основная информация</ST>
+                  <div className="admin-form-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                    <div style={{ gridColumn:'1/-1' }}>
+                      <LB>Название товара *</LB>
+                      <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Белый кружевной корсет" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Категория *</LB>
+                      <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={IS}>
+                        {allCategories.map(c=><option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <LB>Цена (₽) *</LB>
+                      <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} placeholder="3500" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Старая цена (₽)</LB>
+                      <input type="number" value={form.old_price} onChange={e=>setForm(f=>({...f,old_price:e.target.value}))} placeholder="4500" style={IS} />
+                    </div>
+                    <div>
+                      <LB>Размеры (через запятую)</LB>
+                      <input value={form.sizes} onChange={e=>setForm(f=>({...f,sizes:e.target.value}))} placeholder="XS, S, M, L, XL" style={IS} />
+                    </div>
+                    <div style={{ gridColumn:'1/-1' }}>
+                      <LB>Описание товара</LB>
+                      <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={3}
+                        style={{ ...IS, resize:'vertical', minHeight:80, lineHeight:1.5 }} />
                     </div>
                   </div>
-                  <button className={styles.cartRemove} onClick={() => removeFromCart(item.key)}>×</button>
                 </div>
-              ))}
-              {leftForFree > 0 ? (
-                <div style={{padding:'12px 14px',background:'var(--bg2)',borderRadius:10,margin:'8px 0'}}>
-                  <div style={{fontSize:12,color:'var(--muted)',marginBottom:6}}>До бесплатной доставки ещё <strong style={{color:'var(--accent-dark)'}}>{leftForFree.toLocaleString('ru')} ₽</strong></div>
-                  <div style={{height:4,background:'var(--border)',borderRadius:2}}><div style={{height:'100%',background:'var(--accent)',borderRadius:2,width:`${Math.min(100,(cartTotal/FREE_DELIVERY)*100)}%`,transition:'width .4s'}}/></div>
-                </div>
-              ) : <div style={{padding:'10px 14px',background:'#edf7ed',borderRadius:10,fontSize:13,color:'#3a7a3a',fontWeight:600,margin:'8px 0'}}>🎉 Бесплатная доставка включена!</div>}
-            </>
-          )}
-        </div>
-        {cart.length > 0 && (
-          <div className={styles.cartFooter}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:13,color:'var(--muted)'}}><span>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span></div>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12,fontSize:13,color:'var(--muted)'}}><span>Доставка:</span><span style={{color:deliveryCost===0?'#3a7a3a':'inherit',fontWeight:deliveryCost===0?700:'inherit'}}>{deliveryCost===0?'🎁 Бесплатно':`~${deliveryCost} ₽`}</span></div>
-            <div className={styles.cartTotal}><span>Итого:</span><strong>{orderTotal.toLocaleString('ru')} ₽</strong></div>
-            <button className={styles.orderBtn} onClick={() => { setCartOpen(false); setCheckoutOpen(true) }}>Оформить заказ →</button>
-            <button onClick={sendWhatsApp} style={{width:'100%',padding:'11px',background:'#25d366',color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontWeight:600,marginTop:8,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>💬 Заказать через WhatsApp</button>
-          </div>
-        )}
-      </div>
-
-      {/* ОФОРМЛЕНИЕ ЗАКАЗА */}
-      {checkoutOpen && (
-        <div className={styles.modalOverlay} onClick={() => setCheckoutOpen(false)}>
-          <div className={styles.modalBox} onClick={e=>e.stopPropagation()}>
-            <button onClick={() => setCheckoutOpen(false)} className={styles.modalClose}>✕</button>
-            {orderSent ? (
-              <div style={{textAlign:'center',padding:'32px 0'}}>
-                <div style={{fontSize:64,marginBottom:16}}>✅</div>
-                <h3 style={{fontFamily:'Georgia,serif',fontSize:24,fontWeight:300,marginBottom:8}}>Заказ отправлен!</h3>
-                <p style={{color:'var(--muted)',fontSize:14}}>Менеджер свяжется в WhatsApp в течение 5 минут</p>
-              </div>
-            ) : (
-              <>
-                <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Оформление заказа</h3>
-                <p style={{fontSize:13,color:'var(--muted)',marginBottom:24}}>Заполните форму и выберите способ оплаты</p>
-                <form onSubmit={submitOrder} style={{display:'flex',flexDirection:'column',gap:14}}>
-
-                  {/* Имя */}
+                {parsedSizesForStock.length > 0 && (
                   <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Ваше имя *</label>
-                    <input
-                      type="text"
-                      required
-                      value={orderForm.name}
-                      onChange={e => { setOrderForm(v=>({...v,name:e.target.value})); setFormErrors(err=>({...err,name:''})) }}
-                      placeholder="Анна Иванова"
-                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.name?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.name?'#fff8f8':'#fff'}}
-                    />
-                    {formErrors.name && <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.name}</div>}
-                  </div>
-
-                  {/* Телефон с маской */}
-                  <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Телефон *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={orderForm.phone}
-                      onChange={handlePhoneChange}
-                      placeholder="+7 (999) 123-45-67"
-                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.phone?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.phone?'#fff8f8':'#fff'}}
-                    />
-                    {formErrors.phone
-                      ? <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.phone}</div>
-                      : <div style={{fontSize:11,color:'var(--muted)',marginTop:4}}>Формат: +7 (999) 123-45-67</div>
-                    }
-                  </div>
-
-                  {/* Способ доставки */}
-                  <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:8}}>Способ доставки *</label>
-                    <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                      {[
-                        ['post', '🚚', 'Доставка по России', deliveryCost > 0 && deliveryMethod==='post' ? `~${350} ₽` : '🎁 Бесплатно', 'Почта РФ · 5–14 дней'],
-                        ['pickup', '🏪', 'Самовывоз — магазин «Старая Европа»', 'Бесплатно', 'Калининград, по договорённости'],
-                      ].map(([val, icon, title, price, sub]) => (
-                        <label key={val} onClick={() => setDeliveryMethod(val)}
-                          style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',border:`2px solid ${deliveryMethod===val?'var(--accent)':'var(--border)'}`,borderRadius:10,cursor:'pointer',background:deliveryMethod===val?'#fdf3f5':'#fff',transition:'all .2s'}}>
-                          <div style={{width:20,height:20,borderRadius:'50%',border:`2px solid ${deliveryMethod===val?'var(--accent)':'#ccc'}`,background:deliveryMethod===val?'var(--accent)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                            {deliveryMethod===val && <div style={{width:8,height:8,borderRadius:'50%',background:'#fff'}}/>}
-                          </div>
-                          <span style={{fontSize:20}}>{icon}</span>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b'}}>{title}</div>
-                            <div style={{fontSize:12,color:'var(--muted)'}}>{sub}</div>
-                          </div>
-                          <div style={{fontSize:13,fontWeight:700,color:price==='Бесплатно'||price.includes('🎁')?'#3a7a3a':'#3a2f2b',whiteSpace:'nowrap'}}>{price}</div>
-                        </label>
+                    <ST>📦 Количество по размерам</ST>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(120px, 1fr))', gap:10 }}>
+                      {parsedSizesForStock.map(size => (
+                        <div key={size} style={{ background:'#faf3ed', borderRadius:10, padding:'12px', border:'1.5px solid #ede4dc', textAlign:'center' }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:'#c9748a', marginBottom:8 }}>{size}</div>
+                          <input type="number" min="0" value={form.sizeStock[size] ?? ''} onChange={e => updateSizeStock(size, e.target.value === '' ? '' : Number(e.target.value))} placeholder="0"
+                            style={{ width:'100%', padding:'6px 8px', border:'1.5px solid #ede4dc', borderRadius:7, fontSize:15, fontWeight:700, textAlign:'center', outline:'none', boxSizing:'border-box', background:'#fff' }} />
+                          <div style={{ fontSize:10, color:'#9e8e85', marginTop:4 }}>шт</div>
+                        </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Адрес — только для доставки */}
-                  {deliveryMethod === 'post' && (
-                  <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Город и адрес *</label>
-                    <input
-                      type="text"
-                      required
-                      value={orderForm.address}
-                      onChange={e => { setOrderForm(v=>({...v,address:e.target.value})); setFormErrors(err=>({...err,address:''})) }}
-                      placeholder="Москва, ул. Примерная, д. 1, кв. 5"
-                      style={{width:'100%',padding:'10px 14px',border:`1.5px solid ${formErrors.address?'#fca5a5':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',background:formErrors.address?'#fff8f8':'#fff'}}
-                    />
-                    {formErrors.address && <div style={{fontSize:12,color:'#c45c5c',marginTop:4}}>⚠️ {formErrors.address}</div>}
+                )}
+                <div>
+                  <ST>⚙️ Параметры</ST>
+                  <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:14 }}>
+                    {[[form.is_new, v=>setForm(f=>({...f,is_new:v})), '🆕 Отметить как «New»'],[form.active, v=>setForm(f=>({...f,active:v})), '👁 Показывать на сайте']].map(([checked, onChange, label], i) => (
+                      <label key={i} style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, color:'#3a2f2b', padding:'8px 14px', background:checked?'#fdf3f5':'#fafafa', borderRadius:8, border:`1.5px solid ${checked?'#c9748a':'#ede4dc'}` }}>
+                        <input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)} style={{ width:15, height:15, accentColor:'#c9748a' }} />
+                        {label}
+                      </label>
+                    ))}
                   </div>
-                  )}
-
-                  {/* Комментарий */}
+                  {/* Ссылка на видео ВКонтакте */}
                   <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Комментарий</label>
-                    <textarea value={orderForm.comment} onChange={e=>setOrderForm(v=>({...v,comment:e.target.value}))} placeholder="Пожелания по доставке, упаковке..." rows={2}
-                      style={{width:'100%',padding:'10px 14px',border:'1.5px solid var(--border)',borderRadius:8,fontSize:14,outline:'none',resize:'none',boxSizing:'border-box'}} />
-                  </div>
-
-                  {/* Промокод */}
-                  <div>
-                    <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--muted)',letterSpacing:1,textTransform:'uppercase',marginBottom:5}}>Промокод</label>
-                    <div style={{display:'flex',gap:8}}>
-                      <input value={promoCode} onChange={e=>setPromoCode(e.target.value.toUpperCase())}
-                        placeholder="Введите промокод" disabled={!!promoResult&&!promoResult.error}
-                        style={{flex:1,padding:'10px 14px',border:`1.5px solid ${promoResult?.error?'#fca5a5':promoResult&&!promoResult.error?'#86efac':'var(--border)'}`,borderRadius:8,fontSize:14,outline:'none',boxSizing:'border-box',fontFamily:'monospace',letterSpacing:2}} />
-                      {promoResult && !promoResult.error ? (
-                        <button type="button" onClick={()=>{setPromoResult(null);setPromoCode('')}}
-                          style={{padding:'10px 16px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,cursor:'pointer',fontSize:13,color:'#c45c5c',whiteSpace:'nowrap'}}>
-                          Убрать
-                        </button>
-                      ) : (
-                        <button type="button" onClick={applyPromo} disabled={!promoCode||promoLoading}
-                          style={{padding:'10px 16px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap',opacity:!promoCode?0.5:1}}>
-                          {promoLoading?'...':'Применить'}
+                    <LB>🎬 Ссылка на видео ВКонтакте (необязательно)</LB>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <input
+                        value={form.video_url}
+                        onChange={e => setForm(f => ({ ...f, video_url: e.target.value }))}
+                        placeholder="https://vk.com/video-xxxxxxx_xxxxxxx"
+                        style={{ ...IS, flex:1 }}
+                      />
+                      {form.video_url && (
+                        <button type="button" onClick={() => setForm(f => ({ ...f, video_url: '' }))}
+                          style={{ padding:'10px 14px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, cursor:'pointer', fontSize:12, color:'#c45c5c', whiteSpace:'nowrap' }}>
+                          Удалить
                         </button>
                       )}
                     </div>
-                    {promoResult?.error && <div style={{fontSize:12,color:'#c45c5c',marginTop:5}}>❌ {promoResult.error}</div>}
-                    {promoResult&&!promoResult.error && <div style={{fontSize:12,color:'#3a7a3a',marginTop:5}}>✅ Промокод «{promoResult.code}» применён! Скидка {promoResult.discount_value}{promoResult.discount_type==='percent'?'%':' ₽'}</div>}
-                  </div>
-
-                  {/* Итого */}
-                  <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:13}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Товары:</span><span>{cartTotal.toLocaleString('ru')} ₽</span></div>
-                    {promoDiscount > 0 && <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'#3a7a3a'}}>Скидка ({promoResult.code}):</span><span style={{color:'#3a7a3a',fontWeight:600}}>−{promoDiscount.toLocaleString('ru')} ₽</span></div>}
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{color:'var(--muted)'}}>Доставка:</span><span style={{color:deliveryCost===0?'#3a7a3a':'inherit'}}>{deliveryCost===0?'Бесплатно':`~${deliveryCost} ₽`}</span></div>
-                    <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:15,borderTop:'1px solid var(--border)',paddingTop:8,marginTop:4}}><span>Итого:</span><span style={{color:'var(--accent-dark)'}}>{orderTotal.toLocaleString('ru')} ₽</span></div>
-                  </div>
-
-                  {/* ── КНОПКА ОПЛАТЫ ЮКАССА ── */}
-                  <button
-                    type="button"
-                    onClick={handlePayment}
-                    disabled={paymentLoading}
-                    style={{
-                      padding:'14px',
-                      background: paymentLoading ? '#ccc' : 'linear-gradient(135deg,#c9748a,#a55570)',
-                      color:'#fff',
-                      border:'none',
-                      borderRadius:10,
-                      fontSize:15,
-                      cursor: paymentLoading ? 'not-allowed' : 'pointer',
-                      fontWeight:700,
-                      display:'flex',
-                      alignItems:'center',
-                      justifyContent:'center',
-                      gap:8
-                    }}
-                  >
-                    {paymentLoading ? '⏳ Создаём платёж...' : '💳 Оплатить онлайн ' + orderTotal.toLocaleString('ru') + ' ₽'}
-                  </button>
-
-                  {/* Разделитель */}
-                  <div style={{display:'flex',alignItems:'center',gap:10,color:'var(--muted)',fontSize:12}}>
-                    <div style={{flex:1,height:1,background:'var(--border)'}}/>
-                    <span>или</span>
-                    <div style={{flex:1,height:1,background:'var(--border)'}}/>
-                  </div>
-
-                  {/* WhatsApp кнопка */}
-                  <button type="submit" style={{padding:'14px',background:'#25d366',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
-                    💬 Подтвердить через WhatsApp
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* РАЗМЕРНАЯ СЕТКА */}
-      {sizeChartOpen && (
-        <div className={styles.modalOverlay} style={{zIndex:600}} onClick={() => setSizeChartOpen(false)}>
-          <div className={styles.modalBox} style={{maxWidth:620}} onClick={e=>e.stopPropagation()}>
-            <button onClick={() => setSizeChartOpen(false)} className={styles.modalClose}>✕</button>
-            <h3 style={{fontFamily:'Georgia,serif',fontSize:22,fontWeight:300,marginBottom:4}}>Размерная сетка</h3>
-            <p style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>Российские стандарты</p>
-            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Одежда (пижамы, халаты, сорочки)</h4>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:24}}>
-              <thead><tr style={{background:'var(--bg2)'}}>{['Размер','Грудь','Талия','Бёдра'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}</tr></thead>
-              <tbody>{[['XS (42)','80–84','60–64','86–90'],['S (44)','84–88','64–68','90–94'],['M (46)','88–92','68–72','94–98'],['L (48)','92–96','72–76','98–102'],['XL (50)','96–100','76–80','102–106'],['XXL (52)','100–104','80–84','106–110']].map(([s,...v],i)=>(
-                <tr key={s} style={{background:i%2===0?'#fff':'var(--bg)'}}><td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{s}</td>{v.map((val,j)=><td key={j} style={{padding:'8px 12px'}}>{val} см</td>)}</tr>
-              ))}</tbody>
-            </table>
-            <h4 style={{fontSize:12,fontWeight:700,letterSpacing:1,textTransform:'uppercase',marginBottom:10}}>Бюстгальтеры</h4>
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,marginBottom:20}}>
-              <thead><tr style={{background:'var(--bg2)'}}>{['Размер','Объём груди','Под грудью'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:600,borderBottom:'2px solid var(--border)',fontSize:12}}>{h}</th>)}</tr></thead>
-              <tbody>{[['75A','83–85','73–77'],['75B','85–87','73–77'],['80B','88–90','78–82'],['80C','90–92','78–82'],['85B','93–95','83–87'],['85C','95–97','83–87'],['90C','98–100','88–92'],['90D','100–102','88–92']].map(([s,...v],i)=>(
-                <tr key={s} style={{background:i%2===0?'#fff':'var(--bg)'}}><td style={{padding:'8px 12px',fontWeight:700,color:'var(--accent-dark)'}}>{s}</td>{v.map((val,j)=><td key={j} style={{padding:'8px 12px'}}>{val} см</td>)}</tr>
-              ))}</tbody>
-            </table>
-            <div style={{padding:'12px',background:'#fff8f0',borderRadius:8,fontSize:12,color:'var(--muted)',lineHeight:1.6}}>💡 Не знаете размер? Напишите в WhatsApp — поможем!</div>
-          </div>
-        </div>
-      )}
-
-      {/* ЛАЙТБОКС */}
-      {lightbox !== null && (
-        <div className={styles.lbOverlay} onClick={closeLightbox}>
-          <div className={styles.lbBox} onClick={e=>e.stopPropagation()}>
-            <button className={styles.lbClose} onClick={closeLightbox}>✕</button>
-            <div className={styles.lbMain}>
-              {lbTotal > 1 && <button className={styles.lbPrev} onClick={e=>{e.stopPropagation();prevMedia()}}>‹</button>}
-              {lbIsVideo
-                ? (() => {
-                    const url = lbUrl || ''
-                    // ВКонтакте — embed iframe
-                    if (url.includes('vk.com/video') || url.includes('vk.com/clip')) {
-                      // Конвертируем ссылку в embed
-                      // vk.com/video-123_456 → vk.com/video_ext.php?oid=-123&id=456
-                      let embedUrl = url
-                      const match = url.match(/video(-?\d+)_(\d+)/)
-                      if (match) {
-                        embedUrl = `https://vk.com/video_ext.php?oid=${match[1]}&id=${match[2]}&hd=2`
-                      }
-                      return (
-                        <iframe
-                          src={embedUrl}
-                          className={styles.lbImg}
-                          style={{border:'none', background:'#000', width:'100%', height:'100%'}}
-                          allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                          allowFullScreen
-                        />
-                      )
-                    }
-                    // YouTube
-                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                      let videoId = ''
-                      const ytMatch = url.match(/(?:v=|youtu\.be\/)([^&?]+)/)
-                      if (ytMatch) videoId = ytMatch[1]
-                      return (
-                        <iframe
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-                          className={styles.lbImg}
-                          style={{border:'none', background:'#000', width:'100%', height:'100%'}}
-                          allow="autoplay; encrypted-media"
-                          allowFullScreen
-                        />
-                      )
-                    }
-                    // Обычный файл
-                    return <video src={url} controls autoPlay muted loop className={styles.lbImg} style={{objectFit:'contain', background:'#000'}} />
-                  })()
-                : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
-              {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
-            </div>
-            {lbTotal > 1 && (
-              <div className={styles.lbThumbs}>
-                {lbImgs.map((url,idx) => (
-                  <div key={idx} className={`${styles.lbThumb} ${idx===lightbox.mediaIdx?styles.lbThumbActive:''}`}
-                    onClick={e=>{e.stopPropagation();setLightbox(l=>({...l,mediaIdx:idx}))}}>
-                    <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',borderRadius:6}} />
-                  </div>
-                ))}
-                {lbHasVideo && (
-                  <div className={`${styles.lbThumb} ${lbImgs.length===lightbox.mediaIdx?styles.lbThumbActive:''}`}
-                    onClick={e=>{e.stopPropagation();setLightbox(l=>({...l,mediaIdx:lbImgs.length}))}}>
-                    <div style={{width:'100%',height:'100%',background:'#3a2f2b',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:18,borderRadius:6,flexDirection:'column',gap:4}}>
-                      <span>▶</span>
-                      <span style={{fontSize:9,opacity:.7}}>{lightbox?.product.video_url?.includes('vk.com')?'VK':'Видео'}</span>
+                    {form.video_url && (
+                      <div style={{ marginTop:6, fontSize:12, color:'#3a7a3a' }}>✅ Ссылка добавлена</div>
+                    )}
+                    <div style={{ fontSize:11, color:'#9e8e85', marginTop:4 }}>
+                      ВКонтакте → Видео → Загрузить → настройки «Только по ссылке» → скопируй ссылку
                     </div>
                   </div>
-                )}
+                </div>
+                <div style={{ display:'flex', gap:12, paddingTop:8, borderTop:'1px solid #ede4dc' }}>
+                  <button onClick={saveProduct} disabled={!form.name||!form.price||loading}
+                    style={{ flex:1, padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600 }}>
+                    {loading ? '⏳ Сохранение...' : editProduct ? '✅ Сохранить' : '✅ Добавить товар'}
+                  </button>
+                  <button onClick={()=>{setTab('list');resetForm()}}
+                    style={{ padding:'14px 22px', background:'#f5f0ed', border:'1.5px solid #ede4dc', borderRadius:10, fontSize:14, cursor:'pointer', color:'#3a2f2b' }}>
+                    Отмена
+                  </button>
+                </div>
               </div>
-            )}
-            <div className={styles.lbInfo}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                <div className={styles.lbCat}>{lightbox.product.category}</div>
-                <button onClick={() => toggleWishlist(lightbox.product.id)}
-                  style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:wishlist.includes(lightbox.product.id)?'var(--accent)':'var(--muted)',transition:'all .2s'}}>
-                  <svg viewBox="0 0 24 24" fill={wishlist.includes(lightbox.product.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.5" width="18" height="18">
-                    <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
-                  </svg>
+            </div>
+          )}
+
+          {/* ── Промокоды ── */}
+          {tab === 'promo' && (
+            <div style={{ maxWidth:900 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>🏷️ Промокоды</h2>
+              <div style={{background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:24}}>
+                <ST>➕ Создать промокод</ST>
+                <div className="admin-promo-grid" style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:14}}>
+                  <div><LB>Код *</LB><input value={newPromo.code} onChange={e=>setNewPromo(p=>({...p,code:e.target.value.toUpperCase()}))} placeholder="SALE20" style={IS} /></div>
+                  <div><LB>Тип *</LB><select value={newPromo.discount_type} onChange={e=>setNewPromo(p=>({...p,discount_type:e.target.value}))} style={IS}><option value="percent">Процент (%)</option><option value="fixed">Фиксированная (₽)</option></select></div>
+                  <div><LB>Размер скидки *</LB><input type="number" value={newPromo.discount_value} onChange={e=>setNewPromo(p=>({...p,discount_value:e.target.value}))} style={IS} /></div>
+                  <div><LB>Мин. сумма (₽)</LB><input type="number" value={newPromo.min_order} onChange={e=>setNewPromo(p=>({...p,min_order:e.target.value}))} placeholder="0" style={IS} /></div>
+                  <div><LB>Макс. активаций</LB><input type="number" value={newPromo.max_uses} onChange={e=>setNewPromo(p=>({...p,max_uses:e.target.value}))} placeholder="0 = безлимит" style={IS} /></div>
+                  <div><LB>Действует до</LB><input type="date" value={newPromo.expires_at} onChange={e=>setNewPromo(p=>({...p,expires_at:e.target.value}))} style={IS} /></div>
+                </div>
+                <button onClick={createPromo} style={{padding:'12px 28px',background:'linear-gradient(135deg,#c9748a,#a55570)',color:'#fff',border:'none',borderRadius:10,fontSize:14,cursor:'pointer',fontWeight:600}}>✅ Создать промокод</button>
+              </div>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24 }}>
+                <ST>📋 Все промокоды</ST>
+                {promosLoading ? <p style={{color:'#9e8e85',textAlign:'center',padding:24}}>⏳ Загрузка...</p>
+                : promos.length === 0 ? <p style={{color:'#9e8e85',textAlign:'center',padding:32}}>Промокодов пока нет</p>
+                : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {promos.map(p => (
+                    <div key={p.id} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',background:p.active?'#fff':'#fafafa',border:`1.5px solid ${p.active?'#ede4dc':'#fca5a5'}`,borderRadius:12,flexWrap:'wrap'}}>
+                      <div style={{background:'#fdf3f5',border:'2px solid #f0c8d2',borderRadius:8,padding:'6px 14px',fontFamily:'monospace',fontSize:16,fontWeight:700,color:'#c9748a',letterSpacing:2}}>{p.code}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:14,fontWeight:600,color:'#3a2f2b'}}>Скидка: <span style={{color:'#c9748a'}}>{p.discount_value}{p.discount_type==='percent'?'%':' ₽'}</span></div>
+                        <div style={{fontSize:12,color:'#9e8e85'}}>Использовано: {p.used_count||0}{p.max_uses>0?`/${p.max_uses}`:''} раз{p.expires_at?` · до ${new Date(p.expires_at).toLocaleDateString('ru')}`:''}</div>
+                      </div>
+                      <div style={{display:'flex',gap:8}}>
+                        <span style={{padding:'3px 10px',borderRadius:6,fontSize:11,background:p.active?'#edf7ed':'#fef2f2',color:p.active?'#3a7a3a':'#c45c5c',fontWeight:600}}>{p.active?'● Активен':'● Откл.'}</span>
+                        <button onClick={()=>togglePromo(p.id,p.active)} style={{padding:'5px 10px',background:'#faf3ed',border:'1px solid #ede4dc',borderRadius:6,cursor:'pointer',fontSize:12}}>{p.active?'Откл.':'Вкл.'}</button>
+                        <button onClick={()=>deletePromo(p.id)} style={{padding:'5px 10px',background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:6,cursor:'pointer',fontSize:12,color:'#c45c5c'}}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>}
+              </div>
+            </div>
+          )}
+
+          {/* ── Категории ── */}
+          {tab === 'cats' && (
+            <div style={{ maxWidth:780 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>📂 Категории</h2>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24, marginBottom:20 }}>
+                <ST>➕ Добавить категорию</ST>
+                <div style={{ display:'flex', gap:10, marginTop:4 }}>
+                  <input value={newCatName} onChange={e => setNewCatName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCategory()} placeholder="Название категории" style={{ ...IS, flex:1 }} />
+                  <button onClick={addCategory} disabled={!newCatName.trim()} style={{ padding:'10px 22px', background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontSize:14, fontWeight:600, opacity:!newCatName.trim()?0.5:1 }}>+ Добавить</button>
+                </div>
+              </div>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:24 }}>
+                <ST>📂 Все категории ({allCategories.length})</ST>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {allCategories.map((cat, idx) => {
+                    const count = products.filter(p => p.category === cat).length
+                    return (
+                      <div key={cat} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'#fafafa', border:'1.5px solid #ede4dc', borderRadius:10 }}>
+                        <span style={{ fontSize:12, color:'#c9748a', fontWeight:700, minWidth:24 }}>#{idx+1}</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:14, fontWeight:600, color:'#3a2f2b' }}>{cat}</div>
+                          <div style={{ fontSize:12, color:'#9e8e85' }}>{count === 0 ? 'Нет товаров' : `${count} товаров`}</div>
+                        </div>
+                        <button onClick={() => removeCategory(cat)} style={{ padding:'6px 14px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:8, cursor:'pointer', fontSize:12, color:'#c45c5c', fontWeight:600 }}>🗑 Удалить</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Настройки ── */}
+          {tab === 'settings' && (
+            <div style={{ maxWidth:680 }}>
+              <h2 style={{ fontFamily:'Georgia,serif', fontWeight:300, marginBottom:24, color:'#3a2f2b', fontSize:26 }}>⚙️ Настройки сайта</h2>
+              <div style={{ background:'#fff', border:'1.5px solid #ede4dc', borderRadius:16, padding:28, display:'flex', flexDirection:'column', gap:22 }}>
+                <div>
+                  <ST>🖼️ Главный баннер</ST>
+                  {settings.hero_image ? (
+                    <div style={{ position:'relative', width:'100%', height:160, borderRadius:12, overflow:'hidden', marginBottom:12 }}>
+                      <img src={settings.hero_image} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:10 }}>
+                        <label style={{ padding:'8px 16px', background:'#fff', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600 }}>Заменить<input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} /></label>
+                        <button onClick={()=>setSettings(s=>({...s,hero_image:''}))} style={{ padding:'8px 16px', background:'#fef2f2', border:'none', borderRadius:8, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>Удалить</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:130, border:'2px dashed #ede4dc', borderRadius:12, cursor:'pointer', color:'#9e8e85', background:'#fafafa', marginBottom:12 }}>
+                      <span style={{ fontSize:36, marginBottom:8 }}>🖼️</span><span style={{ fontSize:13 }}>Загрузить главное фото</span>
+                      <input type="file" accept="image/*" onChange={e=>handleHeroUpload(e.target.files[0])} style={{ display:'none' }} />
+                    </label>
+                  )}
+                  <div style={{ marginBottom:12 }}><LB>Заголовок</LB><input value={settings.hero_title} onChange={e=>setSettings(s=>({...s,hero_title:e.target.value}))} style={IS} /></div>
+                  <div><LB>Подзаголовок</LB><input value={settings.hero_subtitle} onChange={e=>setSettings(s=>({...s,hero_subtitle:e.target.value}))} style={IS} /></div>
+                </div>
+                <div>
+                  <ST>🚚 Доставка</ST>
+                  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                    <div><LB>Бесплатная доставка от (₽)</LB><input type="number" value={settings.free_delivery_amount} onChange={e=>setSettings(s=>({...s,free_delivery_amount:Number(e.target.value)}))} style={IS} /></div>
+                    <div><LB>Стандартная доставка</LB><input value={settings.delivery_cdek||''} onChange={e=>setSettings(s=>({...s,delivery_cdek:e.target.value}))} style={IS} /></div>
+                    <div><LB>Срочная доставка</LB><input value={settings.delivery_post||''} onChange={e=>setSettings(s=>({...s,delivery_post:e.target.value}))} style={IS} /></div>
+                    <div><LB>Самовывоз</LB><input value={settings.delivery_courier||''} onChange={e=>setSettings(s=>({...s,delivery_courier:e.target.value}))} style={IS} /></div>
+                  </div>
+                </div>
+                <div>
+                  <ST>🔒 Политика возврата</ST>
+                  <textarea value={settings.return_policy||''} onChange={e=>setSettings(s=>({...s,return_policy:e.target.value}))} rows={3}
+                    style={{ ...IS, resize:'vertical', minHeight:70, lineHeight:1.5 }} />
+                </div>
+                <button onClick={saveSettings} disabled={settingsLoading}
+                  style={{ padding:14, background:'linear-gradient(135deg,#c9748a,#a55570)', color:'#fff', border:'none', borderRadius:10, fontSize:15, cursor:'pointer', fontWeight:600 }}>
+                  {settingsLoading ? '⏳ Сохранение...' : '✅ Сохранить настройки'}
                 </button>
               </div>
-              <div className={styles.lbName}>{lightbox.product.name}</div>
-              <div className={styles.lbPrices}>
-                <span className={styles.lbPrice}>{lightbox.product.price?.toLocaleString('ru')} ₽</span>
-                {lightbox.product.old_price && (
-                  <>
-                    <span className={styles.lbOld}>{lightbox.product.old_price.toLocaleString('ru')} ₽</span>
-                    <span style={{background:'#fef2f2',color:'#c45c5c',fontSize:11,fontWeight:700,padding:'3px 8px',borderRadius:6}}>
-                      -{discount(lightbox.product)}%
-                    </span>
-                  </>
-                )}
-              </div>
-              {lightbox.product.description && <p className={styles.lbDesc}>{lightbox.product.description}</p>}
-              {lightbox.product.sizes?.length > 0 && (
-                <div>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <span style={{fontSize:12,color:'var(--text)',fontWeight:700,letterSpacing:.5}}>РАЗМЕР:</span>
-                    <button onClick={() => setSizeChartOpen(true)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--accent)',fontSize:12,textDecoration:'underline',padding:0,fontFamily:'var(--sans)'}}>
-                      Таблица размеров →
-                    </button>
-                  </div>
-                  <div className={styles.lbSizes}>
-                    {lightbox.product.sizes.map(s => (
-                      <span key={s} className={`${styles.lbSize} ${lightbox.selectedSize===s?styles.lbSizeActive:''}`}
-                        onClick={() => setLightbox(l=>({...l,selectedSize:s}))}>{s}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                <div style={{fontSize:12,color:'var(--text)',fontWeight:700,letterSpacing:.5,marginBottom:10}}>КОЛИЧЕСТВО:</div>
-                <div style={{display:'flex',alignItems:'center',gap:0,border:'1.5px solid var(--border)',borderRadius:10,overflow:'hidden',width:'fit-content'}}>
-                  <button onClick={() => setLbQty(q => Math.max(1, q-1))} style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>−</button>
-                  <span style={{width:44,textAlign:'center',fontSize:15,fontWeight:700,borderLeft:'1px solid var(--border)',borderRight:'1px solid var(--border)',height:40,display:'flex',alignItems:'center',justifyContent:'center'}}>{lbQty}</span>
-                  <button onClick={() => setLbQty(q => q+1)} style={{width:40,height:40,background:'none',border:'none',cursor:'pointer',fontSize:20,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text)'}}>+</button>
-                </div>
-              </div>
-              <div style={{background:'var(--bg2)',borderRadius:10,padding:'12px 16px',fontSize:14}}>
-                <div style={{display:'flex',justifyContent:'space-between',color:'var(--muted)'}}>
-                  <span>{lbQty} шт × {lightbox.product.price?.toLocaleString('ru')} ₽</span>
-                  <strong style={{color:'var(--text)'}}>{(lightbox.product.price * lbQty).toLocaleString('ru')} ₽</strong>
-                </div>
-              </div>
-              <button className={styles.lbAddBtn} onClick={() => { addToCart(lightbox.product, lightbox.selectedSize, lbQty); closeLightbox() }}>
-                + В корзину {lightbox.selectedSize && `(${lightbox.selectedSize})`}
-              </button>
-              <div className={styles.lbFacts}>
-                <div className={styles.lbFact}><span>🚚</span><span>Доставка 2–7 дней по России</span></div>
-                <div className={styles.lbFact}><span>🔒</span><span>Товар не подлежит обмену и возврату</span></div>
-                <div className={styles.lbFact}><span>💳</span><span>Оплата картой МИР</span></div>
-              </div>
-              <a href={`https://wa.me/79114589339?text=${encodeURIComponent(`Здравствуйте! Хочу узнать подробнее о товаре: ${lightbox.product.name}`)}`}
-                target="_blank" rel="noreferrer" className={styles.lbWa}>
-                <WaIcon size={16}/>Задать вопрос о товаре
-              </a>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ИЗБРАННОЕ */}
-      {wishlistOpen && <div className={styles.cartOverlay} onClick={() => setWishlistOpen(false)} />}
-      <div className={`${styles.cartSidebar} ${wishlistOpen ? styles.open : ''}`}>
-        <div className={styles.cartHeader}>
-          <h3>Избранное {wishlist.length > 0 && <span style={{fontSize:13,color:'var(--muted)',fontWeight:400}}>· {wishlist.length} шт</span>}</h3>
-          <button onClick={() => setWishlistOpen(false)}>✕</button>
-        </div>
-        <div className={styles.cartItems}>
-          {wishlist.length === 0 ? (
-            <div className={styles.cartEmpty}>
-              <div style={{fontSize:48,marginBottom:16}}>❤️</div>
-              <p>Избранное пусто</p>
-              <p style={{fontSize:12,color:'var(--muted)',marginTop:8}}>Нажмите ❤️ на товаре чтобы добавить</p>
-            </div>
-          ) : (
-            products.filter(p => wishlist.includes(p.id)).map(product => (
-              <div key={product.id} style={{display:'flex',gap:12,marginBottom:16,paddingBottom:16,borderBottom:'1px solid var(--border)'}}>
-                {product.images?.[0] && (
-                  <img src={product.images[0]} alt={product.name} style={{width:72,height:96,objectFit:'cover',objectPosition:'top',borderRadius:8,cursor:'pointer',flexShrink:0}}
-                    onClick={() => { openLightbox(product); setWishlistOpen(false) }} />
-                )}
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontFamily:'Georgia,serif',fontSize:14,marginBottom:4,color:'var(--text)',cursor:'pointer',lineHeight:1.3}}
-                    onClick={() => { openLightbox(product); setWishlistOpen(false) }}>{product.name}</div>
-                  <div style={{fontSize:11,color:'var(--muted)',marginBottom:8}}>{product.category}</div>
-                  <div style={{fontWeight:700,fontSize:15,color:'var(--accent-dark)',marginBottom:10}}>{product.price?.toLocaleString('ru')} ₽</div>
-                  <div style={{display:'flex',gap:8}}>
-                    <button onClick={() => { addToCart(product, product.sizes?.[0]); setWishlistOpen(false) }}
-                      style={{flex:1,padding:'7px 12px',background:'var(--accent)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:600}}>
-                      + В корзину
-                    </button>
-                    <button onClick={() => toggleWishlist(product.id)}
-                      style={{width:34,height:34,background:'#fef2f2',border:'1px solid #fca5a5',borderRadius:8,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#c45c5c',fontSize:16}}>
-                      ×
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
           )}
+
         </div>
       </div>
     </>
   )
 }
 
-function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct }) {
-  const [hovered, setHovered] = useState(false)
-  const imgs = product.images || []
-  const mainImg = imgs[0] || ''
-  const hoverImg = imgs[1] || ''
-
-  return (
-    <div className={styles.prodCard}>
-      <div className={styles.prodImg}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onClick={() => onOpen(product)}
-        style={{cursor:'pointer', position:'relative'}}>
-
-        {/* Главное фото */}
-        {mainImg && (
-          <img
-            src={mainImg}
-            alt={product.name}
-            loading="lazy"
-            style={{
-              position: hoverImg ? 'absolute' : 'relative',
-              top:0, left:0, width:'100%', height:'100%',
-              objectFit:'cover', objectPosition:'top',
-              opacity: hovered && hoverImg ? 0 : 1,
-              transition: 'opacity 0.35s ease',
-              display: 'block'
-            }}
-          />
-        )}
-
-        {/* Второе фото (появляется при наведении) */}
-        {hoverImg && (
-          <img
-            src={hoverImg}
-            alt={product.name}
-            loading="lazy"
-            style={{
-              position: 'absolute',
-              top:0, left:0, width:'100%', height:'100%',
-              objectFit:'cover', objectPosition:'top',
-              opacity: hovered ? 1 : 0,
-              transition: 'opacity 0.35s ease',
-              display: 'block'
-            }}
-          />
-        )}
-        <div className={styles.prodBadges}>
-          {product.is_new && <span className={styles.tagNew}>New</span>}
-          {discountPct > 0 && <span className={styles.tagSale}>-{discountPct}%</span>}
-          {product.video_url && <span className={styles.tagVideo}>▶ видео</span>}
-        </div>
-        <button className={styles.wishBtn} onClick={e=>{e.stopPropagation();onWishlist()}}
-          style={{color: isWishlisted ? 'var(--accent)' : 'var(--muted)'}}>
-          <svg viewBox="0 0 24 24" fill={isWishlisted?'currentColor':'none'} stroke="currentColor" strokeWidth="1.5" width="16" height="16">
-            <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
-          </svg>
-        </button>
-        <div className={styles.addBar} onClick={e => { e.stopPropagation(); onOpen(product) }}>
-          Выбрать размер →
-        </div>
-      </div>
-      <div className={styles.prodBody}>
-        <div className={styles.prodCat}>{product.category}</div>
-        <div className={styles.prodName}>{product.name}</div>
-        <div className={styles.prodPrices}>
-          <span className={styles.now}>{product.price?.toLocaleString('ru')} ₽</span>
-          {product.old_price && <span className={styles.was}>{product.old_price.toLocaleString('ru')} ₽</span>}
-        </div>
-        {product.sizes?.length > 0 && (
-          <div className={styles.prodSizes}>{product.sizes.map(s=><span key={s}>{s}</span>)}</div>
-        )}
-      </div>
-    </div>
-  )
+function ST({ children }) {
+  return <div style={{ fontSize:13, fontWeight:700, color:'#3a2f2b', marginBottom:10, paddingBottom:8, borderBottom:'1px solid #f0e8e0' }}>{children}</div>
 }
-
-export async function getServerSideProps() {
-  try {
-    const [productsRes, settingsRes] = await Promise.all([
-      supabase.from('products').select('*').eq('active', true).order('created_at', { ascending: false }),
-      supabase.from('settings').select('*').eq('id', 1).single()
-    ])
-    const allProducts = productsRes.data || []
-    const settings = settingsRes.data || null
-    const featuredIds = settings?.featured_ids || []
-    const featuredProducts = featuredIds.length > 0
-      ? allProducts.filter(p => featuredIds.includes(p.id))
-      : allProducts.filter(p => p.is_new).slice(0, 10)
-    return { props: { initialProducts: allProducts, settings, featuredProducts } }
-  } catch {
-    return { props: { initialProducts: [], settings: null, featuredProducts: [] } }
-  }
+function LB({ children }) {
+  return <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#9e8e85', letterSpacing:1, textTransform:'uppercase', marginBottom:5 }}>{children}</label>
 }
