@@ -27,6 +27,16 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [deliveryMethod, setDeliveryMethod] = useState('post') // post | pickup
 
+  // Оптимизация Cloudinary URL
+  function imgUrl(url, size = 400) {
+    if (!url) return url
+    // Только для Cloudinary ссылок
+    if (url.includes('res.cloudinary.com')) {
+      return url.replace('/upload/', `/upload/q_auto,f_auto,w_${size}/`)
+    }
+    return url
+  }
+
   const FREE_DELIVERY = settings?.free_delivery_amount || 10000
   const customCats = settings?.custom_categories || []
   const baseFallback = ['Комплекты','Бюстгальтеры','Корсеты','Пижамы','Боди','Ночные сорочки','Халаты','Трусики','Чулки','Пояса для чулок','Купальники']
@@ -494,7 +504,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
           </div>
         </div>
         <div className={styles.heroVisual}>
-          {heroImg && <img src={heroImg} alt="Bellissimo Lingerie" loading="eager" />}
+          {heroImg && <img src={imgUrl(heroImg, 1200)} alt="Bellissimo Lingerie" loading="eager" />}
         </div>
       </section>
 
@@ -509,7 +519,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
               {[...featuredProducts, ...featuredProducts, ...featuredProducts].map((product, idx) => (
                 <div key={idx} className={styles.tickerItem} onClick={() => openLightbox(product)}>
                   <div className={styles.tickerImg}>
-                    {product.images?.[0] && <img src={product.images[0]} alt={product.name} loading="lazy" />}
+                    {product.images?.[0] && <img src={imgUrl(product.images[0], 400)} alt={product.name} loading="lazy" />}
                     {product.is_new && <span className={styles.tagNew} style={{position:'absolute',top:10,left:10,zIndex:2}}>New</span>}
                   </div>
                   <div className={styles.tickerInfo}>
@@ -697,7 +707,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             <>
               {cart.map(item => (
                 <div key={item.key} className={styles.cartItem}>
-                  {item.images?.[0] && <img src={item.images[0]} alt={item.name} />}
+                  {item.images?.[0] && <img src={imgUrl(item.images[0], 200)} alt={item.name} />}
                   <div className={styles.cartItemInfo}>
                     <div className={styles.cartItemName}>{item.name}</div>
                     <div className={styles.cartItemCat}>{item.category}{item.selectedSize && <span style={{marginLeft:6,padding:'2px 6px',background:'var(--bg2)',borderRadius:4,fontSize:10,fontWeight:600}}>{item.selectedSize}</span>}</div>
@@ -962,7 +972,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                       </div>
                     )
                   })()
-                : <img src={lbUrl} alt={lightbox.product.name} className={styles.lbImg} />}
+                : <img src={imgUrl(lbUrl, 1200)} alt={lightbox.product.name} className={styles.lbImg} />}
               {lbTotal > 1 && <button className={styles.lbNext} onClick={e=>{e.stopPropagation();nextMedia()}}>›</button>}
             </div>
             {lbTotal > 1 && (
@@ -970,7 +980,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
                 {lbImgs.map((url,idx) => (
                   <div key={idx} className={`${styles.lbThumb} ${idx===lightbox.mediaIdx?styles.lbThumbActive:''}`}
                     onClick={e=>{e.stopPropagation();setLightbox(l=>({...l,mediaIdx:idx}))}}>
-                    <img src={url} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',borderRadius:6}} />
+                    <img src={imgUrl(url, 200)} alt="" style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'top',borderRadius:6}} />
                   </div>
                 ))}
                 {lbHasVideo && (
@@ -1072,7 +1082,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             products.filter(p => wishlist.includes(p.id)).map(product => (
               <div key={product.id} style={{display:'flex',gap:12,marginBottom:16,paddingBottom:16,borderBottom:'1px solid var(--border)'}}>
                 {product.images?.[0] && (
-                  <img src={product.images[0]} alt={product.name} style={{width:72,height:96,objectFit:'cover',objectPosition:'top',borderRadius:8,cursor:'pointer',flexShrink:0}}
+                  <img src={imgUrl(product.images[0], 200)} alt={product.name} style={{width:72,height:96,objectFit:'cover',objectPosition:'top',borderRadius:8,cursor:'pointer',flexShrink:0}}
                     onClick={() => { openLightbox(product); setWishlistOpen(false) }} />
                 )}
                 <div style={{flex:1,minWidth:0}}>
@@ -1106,6 +1116,14 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
   const mainImg = imgs[0] || ''
   const hoverImg = imgs[1] || ''
 
+  function imgUrl(url, size = 400) {
+    if (!url) return url
+    if (url.includes('res.cloudinary.com')) {
+      return url.replace('/upload/', `/upload/q_auto,f_auto,w_${size}/`)
+    }
+    return url
+  }
+
   return (
     <div className={styles.prodCard}>
       <div className={styles.prodImg}
@@ -1117,7 +1135,7 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
         {/* Главное фото */}
         {mainImg && (
           <img
-            src={mainImg}
+            src={imgUrl(mainImg, 500)}
             alt={product.name}
             loading="lazy"
             style={{
@@ -1134,7 +1152,7 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
         {/* Второе фото (появляется при наведении) */}
         {hoverImg && (
           <img
-            src={hoverImg}
+            src={imgUrl(hoverImg, 500)}
             alt={product.name}
             loading="lazy"
             style={{
