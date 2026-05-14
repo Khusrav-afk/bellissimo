@@ -355,34 +355,6 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         🎁 Бесплатная доставка при заказе от <strong>{FREE_DELIVERY.toLocaleString('ru')} ₽</strong> по всей России
       </div>
 
-      {/* Баннер — сайт в процессе наполнения */}
-      <div style={{
-        background: 'linear-gradient(135deg, #3a2f2b, #5a3a48)',
-        color: '#fff',
-        textAlign: 'center',
-        padding: '18px 20px',
-        fontSize: 16,
-        fontFamily: 'Georgia, serif',
-        letterSpacing: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        flexWrap: 'wrap'
-      }}>
-        <span style={{ fontSize: 24 }}>🌹</span>
-        <span>
-          Сайт в процессе наполнения — скоро здесь появятся все товары.
-          <br style={{ display: 'none' }} />
-          {' '}По вопросам заказа пишите нам в{' '}
-          <a href="https://wa.me/79114589339" target="_blank" rel="noreferrer"
-            style={{ color: '#f0c8d2', fontWeight: 700, textDecoration: 'underline' }}>
-            WhatsApp
-          </a>
-        </span>
-        <span style={{ fontSize: 24 }}>🌹</span>
-      </div>
-
       {/* ── ШАПКА ── */}
       <header className={styles.header}>
         <div className={styles.hTop}>
