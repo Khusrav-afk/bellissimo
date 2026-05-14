@@ -7,14 +7,16 @@
     h1 { color: #3a2f2b; font-size: 24px; }
     button { padding: 14px 28px; background: linear-gradient(135deg,#c9748a,#a55570); color: #fff; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
     button:disabled { background: #ccc; cursor: not-allowed; }
-    #log { margin-top: 20px; background: #fff; border-radius: 10px; padding: 16px; min-height: 100px; font-family: monospace; font-size: 13px; white-space: pre-wrap; border: 1px solid #ede4dc; }
+    #log { margin-top: 20px; background: #fff; border-radius: 10px; padding: 16px; min-height: 100px; font-family: monospace; font-size: 13px; white-space: pre-wrap; border: 1px solid #ede4dc; max-height: 400px; overflow-y: auto; }
     .ok { color: #3a7a3a; }
     .err { color: #c45c5c; }
+    progress { width: 100%; height: 20px; margin: 10px 0; }
   </style>
 </head>
 <body>
   <h1>🌹 Перенос фото в Cloudinary</h1>
-  <p>Нажми кнопку — скрипт перенесёт все фото из старого Supabase в Cloudinary автоматически.</p>
+  <p>Скрипт перенесёт все фото из старого Supabase в Cloudinary автоматически.</p>
+  <progress id="bar" value="0" max="140"></progress>
   <p id="progress" style="font-weight:700; color:#c9748a;">Готов к запуску</p>
   <button id="btn" onclick="startMigration()">▶ Начать перенос</button>
   <div id="log">Нажмите кнопку чтобы начать...</div>
@@ -23,6 +25,7 @@
     let offset = 0
     let totalMigrated = 0
     const BATCH = 5
+    const TOTAL = 140
 
     function log(msg, type='') {
       const el = document.getElementById('log')
@@ -41,8 +44,6 @@
 
     async function runBatch() {
       try {
-        document.getElementById('progress').textContent = `Обработано: ${totalMigrated} фото...`
-        
         const res = await fetch('/api/migrate-photos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -57,23 +58,24 @@
         }
 
         totalMigrated += data.migrated
-        log(`✅ Партия ${offset}-${offset+BATCH}: перенесено ${data.migrated}`, 'ok')
-        
-        if (data.errors?.length) {
-          data.errors.forEach(e => log(`  ⚠️ ${e.id}: ${e.error}`, 'err'))
-        }
+        offset += BATCH
 
-        if (data.done) {
-          log(`\n🎉 Готово! Всего перенесено: ${totalMigrated} товаров`, 'ok')
+        document.getElementById('bar').value = offset
+        document.getElementById('progress').textContent = `Обработано: ${offset}/${TOTAL} (перенесено: ${totalMigrated})`
+        
+        if (data.migrated > 0) log(`✅ ${offset}: перенесено ${data.migrated} фото`, 'ok')
+        if (data.errors?.length) data.errors.forEach(e => log(`  ⚠️ ${e.error}`, 'err'))
+
+        if (data.done || offset >= TOTAL) {
+          log(`\n🎉 Готово! Всего перенесено фото у ${totalMigrated} товаров`, 'ok')
           document.getElementById('progress').textContent = `✅ Завершено! Перенесено: ${totalMigrated}`
           document.getElementById('btn').disabled = false
           return
         }
 
-        offset += BATCH
-        setTimeout(runBatch, 1000) // Пауза между батчами
+        setTimeout(runBatch, 500)
       } catch (e) {
-        log('❌ Ошибка соединения: ' + e.message, 'err')
+        log('❌ Ошибка: ' + e.message, 'err')
         document.getElementById('btn').disabled = false
       }
     }
