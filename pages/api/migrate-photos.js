@@ -17,7 +17,7 @@ async function uploadToCloudinary(imageUrl) {
   const signature = crypto.createHash('sha1').update(paramsToSign + apiSecret).digest('hex')
 
   const formData = new FormData()
-  formData.append('file', imageUrl) // Cloudinary умеет качать по URL
+  formData.append('file', imageUrl)
   formData.append('api_key', apiKey)
   formData.append('timestamp', String(timestamp))
   formData.append('signature', signature)
@@ -35,47 +35,48 @@ async function uploadToCloudinary(imageUrl) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { limit = 10, offset = 0 } = req.body
+  const { limit = 5, offset = 0 } = req.body
 
-  // Берём товары со старыми фото
+  // Используем SQL через rpc чтобы найти старые фото
   const { data: products, error } = await supabase
     .from('products')
-    .select('id, images, video_url')
-    .like('images::text', '%uficidakghgxdqtdmpbd%')
+    .select('id, images')
     .range(offset, offset + limit - 1)
 
   if (error) return res.status(500).json({ error: error.message })
-  if (!products.length) return res.status(200).json({ done: true, migrated: 0 })
+
+  // Фильтруем только те у которых есть старые ссылки
+  const oldProducts = (products || []).filter(p =>
+    p.images && p.images.some(img => img && img.includes('uficidakghgxdqtdmpbd'))
+  )
+
+  if (!products || products.length === 0) {
+    return res.status(200).json({ done: true, migrated: 0 })
+  }
 
   let migrated = 0
   const errors = []
 
-  for (const product of products) {
+  for (const product of oldProducts) {
     try {
       const newImages = []
       for (const imgUrl of (product.images || [])) {
-        if (imgUrl.includes('uficidakghgxdqtdmpbd')) {
-          // Загружаем в Cloudinary
+        if (imgUrl && imgUrl.includes('uficidakghgxdqtdmpbd')) {
           const newUrl = await uploadToCloudinary(imgUrl)
           newImages.push(newUrl)
         } else {
-          newImages.push(imgUrl) // Уже в Cloudinary
+          newImages.push(imgUrl)
         }
       }
-
-      // Обновляем в базе
       await supabase.from('products').update({ images: newImages }).eq('id', product.id)
       migrated++
-      console.log(`Migrated ${migrated}: ${product.id}`)
     } catch (e) {
       errors.push({ id: product.id, error: e.message })
-      console.error(`Error for ${product.id}:`, e.message)
     }
   }
 
-  res.status(200).json({
-    migrated,
-    errors,
-    done: products.length < limit
-  })
+  // Проверяем есть ли ещё товары
+  const done = products.length < limit
+
+  res.status(200).json({ migrated, errors, done, total: products.length })
 }
