@@ -834,14 +834,17 @@ export default function Admin() {
                 </div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {filtered.map(p => (
-                    <div key={p.id} style={{ background:'#fff', border:`1.5px solid ${p.active?'#ede4dc':'#fca5a5'}`, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  {filtered.map(p => {
+                    const hasOldPhoto = p.images && p.images.some(img => img && img.includes('uficidakghgxdqtdmpbd'))
+                    return (
+                    <div key={p.id} style={{ background: hasOldPhoto ? '#fff8f0' : '#fff', border:`1.5px solid ${hasOldPhoto ? '#f59e0b' : p.active?'#ede4dc':'#fca5a5'}`, borderRadius:12, padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
                       <div style={{ width:54, height:70, borderRadius:8, overflow:'hidden', background:'#faf3ed', flexShrink:0, position:'relative' }}>
                         {p.images?.[0] && <img src={p.images[0]} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:'top' }} />}
                       </div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontFamily:'Georgia,serif', fontSize:14, marginBottom:3, color:'#3a2f2b', display:'flex', alignItems:'center', gap:6 }}>
                           {p.is_new && <span style={{ background:'#c9748a', color:'#fff', fontSize:9, padding:'1px 5px', borderRadius:4 }}>NEW</span>}
+                          {hasOldPhoto && <span style={{ background:'#f59e0b', color:'#fff', fontSize:9, padding:'1px 5px', borderRadius:4 }}>⚠️ Обновить фото</span>}
                           {p.name}
                         </div>
                         <div style={{ fontSize:11, color:'#9e8e85', display:'flex', gap:10, flexWrap:'wrap' }}>
@@ -862,7 +865,7 @@ export default function Admin() {
                         <button onClick={()=>deleteProduct(p.id)} style={{ padding:'5px 9px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:6, cursor:'pointer', fontSize:13, color:'#c45c5c' }}>🗑</button>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
