@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Head from 'next/head'
+import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import styles from '../styles/Home.module.css'
 
-export default function Home({ initialProducts, settings, featuredProducts }) {
+export default function Home({ initialProducts, settings, featuredProducts, ogProduct }) {
   const [products] = useState(initialProducts || [])
   const [cart, setCart] = useState([])
   const [wishlist, setWishlist] = useState([])
@@ -64,6 +65,10 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   const leftForFree = FREE_DELIVERY - cartTotal
 
   const heroImg = settings?.hero_image || products[0]?.images?.[0] || ''
+  const SITE_URL = 'https://www.bellissimolingerie.ru'
+  const ogImage = ogProduct?.images?.[0]
+    ? imgUrl(ogProduct.images[0], 1200)
+    : (settings?.hero_image || heroImg || '')
   const heroTitle = settings?.hero_title || 'Красота, которая ближе к телу'
   const heroSubtitle = settings?.hero_subtitle || 'Будуарное нижнее бельё для особых моментов'
 
@@ -117,13 +122,48 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
     }).filter(Boolean))
   }
 
-  function openLightbox(product) {
+  const router = useRouter()
+
+  function openLightbox(product, { updateUrl = true } = {}) {
     setLbQty(1)
     setLightbox({ product, mediaIdx: 0, selectedSize: product.sizes?.[0] || null })
     document.body.style.overflow = 'hidden'
+    // Обновляем адрес → /?product=ID, чтобы ссылку можно было скопировать/поделиться
+    if (updateUrl && router.query.product?.toString() !== product.id?.toString()) {
+      router.push(`/?product=${product.id}`, undefined, { shallow: true, scroll: false })
+    }
   }
 
-  function closeLightbox() { setLightbox(null); document.body.style.overflow = '' }
+  function closeLightbox() {
+    setLightbox(null)
+    document.body.style.overflow = ''
+    if (router.query.product) {
+      router.push('/', undefined, { shallow: true, scroll: false })
+    }
+  }
+
+  // Открытие товара по прямой ссылке /?product=ID (шеринг в WhatsApp/Telegram/Instagram)
+  useEffect(() => {
+    const pid = router.query.product
+    if (!pid) return
+    if (lightbox?.product?.id?.toString() === pid.toString()) return
+    const prod = products.find(p => p.id?.toString() === pid.toString())
+    if (prod) openLightbox(prod, { updateUrl: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.product, products])
+
+  // Поделиться ссылкой на конкретный товар
+  async function shareProduct(product) {
+    const url = `${window.location.origin}/?product=${product.id}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: product.name, text: product.name, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        showToast('Ссылка на товар скопирована', 'success')
+      }
+    } catch (_) { /* пользователь отменил шеринг — игнорируем */ }
+  }
 
   function nextMedia() {
     if (!lightbox || lbTotal <= 1) return
@@ -292,7 +332,7 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
   return (
     <>
       <Head>
-        <title>Bellissimo Lingerie — Нижнее бельё в Калининграде, доставка по России</title>
+        <title>{ogProduct ? `${ogProduct.name} — ${ogProduct.price?.toLocaleString('ru')} ₽ | Bellissimo Lingerie` : 'Bellissimo Lingerie — Нижнее бельё в Калининграде, доставка по России'}</title>
         <meta name="description" content="Интернет-магазин будуарного нижнего белья Bellissimo в Калининграде. Комплекты, корсеты, пижамы, бюстгальтеры, купальники, халаты, ночные сорочки. Быстрая доставка по всей России от 350 ₽. Самовывоз бесплатно. Оплата картой МИР онлайн." />
         <meta name="keywords" content="нижнее бельё Калининград, купить нижнее бельё, будуарное бельё, корсет купить Калининград, пижамы Калининград, комплект нижнего белья, красивое нижнее бельё, кружевное бельё, купальники Калининград, халаты женские Калининград, ночные сорочки купить, бельё с доставкой, нижнее бельё онлайн, интернет магазин белья Калининград, бельё недорого, bellissimo lingerie, бюстгальтеры Калининград, трусики женские, чулки Калининград, пояс для чулок, боди женское, корсет кружевной, пижама шёлковая, халат женский, сорочка ночная, нижнее бельё доставка Россия, красивое бельё подарок, бельё для медового месяца, сексуальное нижнее бельё, элитное нижнее бельё, премиальное бельё, бельё оптом Калининград, женское бельё купить онлайн, интернет магазин нижнего белья, доставка белья по России, нижнее бельё недорого с доставкой" />
         <meta name="robots" content="index, follow" />
@@ -301,15 +341,19 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
         <meta name="geo.placename" content="Калининград" />
         <meta name="geo.position" content="54.717891;20.502663" />
         <meta name="ICBM" content="54.717891, 20.502663" />
-        <meta property="og:title" content="Bellissimo Lingerie — Нижнее бельё с доставкой по России" />
-        <meta property="og:description" content="Будуарное нижнее бельё — комплекты, корсеты, пижамы, купальники. Доставка по всей России. Самовывоз в Калининграде бесплатно." />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://www.bellissimolingerie.ru" />
+        <meta property="og:title" content={ogProduct ? `${ogProduct.name} — ${ogProduct.price?.toLocaleString('ru')} ₽` : 'Bellissimo Lingerie — Нижнее бельё с доставкой по России'} />
+        <meta property="og:description" content={ogProduct ? `${ogProduct.category || 'Нижнее бельё'} · ${ogProduct.price?.toLocaleString('ru')} ₽. Bellissimo Lingerie — доставка по всей России, самовывоз в Калининграде.` : 'Будуарное нижнее бельё — комплекты, корсеты, пижамы, купальники. Доставка по всей России. Самовывоз в Калининграде бесплатно.'} />
+        <meta property="og:type" content={ogProduct ? 'product' : 'website'} />
+        <meta property="og:url" content={ogProduct ? `${SITE_URL}/?product=${ogProduct.id}` : SITE_URL} />
+        {ogImage && <meta property="og:image" content={ogImage} />}
+        {ogImage && <meta property="og:image:width" content="1200" />}
+        {ogImage && <meta property="og:image:height" content="1200" />}
         <meta property="og:locale" content="ru_RU" />
         <meta property="og:site_name" content="Bellissimo Lingerie" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Bellissimo Lingerie — Нижнее бельё" />
-        <meta name="twitter:description" content="Будуарное нижнее бельё с доставкой по России" />
+        <meta name="twitter:title" content={ogProduct ? `${ogProduct.name} — ${ogProduct.price?.toLocaleString('ru')} ₽` : 'Bellissimo Lingerie — Нижнее бельё'} />
+        <meta name="twitter:description" content={ogProduct ? `${ogProduct.category || 'Нижнее бельё'} · доставка по России` : 'Будуарное нижнее бельё с доставкой по России'} />
+        {ogImage && <meta name="twitter:image" content={ogImage} />}
         <link rel="canonical" href="https://www.bellissimolingerie.ru" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -969,12 +1013,21 @@ export default function Home({ initialProducts, settings, featuredProducts }) {
             <div className={styles.lbInfo}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                 <div className={styles.lbCat}>{lightbox.product.category}</div>
-                <button onClick={() => toggleWishlist(lightbox.product.id)}
-                  style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:wishlist.includes(lightbox.product.id)?'var(--accent)':'var(--muted)',transition:'all .2s'}}>
-                  <svg viewBox="0 0 24 24" fill={wishlist.includes(lightbox.product.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.5" width="18" height="18">
-                    <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
-                  </svg>
-                </button>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <button onClick={() => shareProduct(lightbox.product)} title="Поделиться товаром"
+                    style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--muted)',transition:'all .2s'}}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" width="18" height="18">
+                      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                      <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>
+                    </svg>
+                  </button>
+                  <button onClick={() => toggleWishlist(lightbox.product.id)}
+                    style={{background:'none',border:'1px solid var(--border)',borderRadius:8,width:36,height:36,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:wishlist.includes(lightbox.product.id)?'var(--accent)':'var(--muted)',transition:'all .2s'}}>
+                    <svg viewBox="0 0 24 24" fill={wishlist.includes(lightbox.product.id)?'currentColor':'none'} stroke="currentColor" strokeWidth="1.5" width="18" height="18">
+                      <path d="M12 21C12 21 4 15 4 8.5C4 5.5 6.5 3 9.5 3C11 3 12 4 12 4S13 3 14.5 3C17.5 3 20 5.5 20 8.5C20 15 12 21 12 21Z"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className={styles.lbName}>{lightbox.product.name}</div>
               <div className={styles.lbPrices}>
@@ -1167,7 +1220,7 @@ function ProductCard({ product, onOpen, isWishlisted, onWishlist, discountPct })
   )
 }
 
-export async function getServerSideProps() {
+export async function getServerSideProps({ query }) {
   try {
     const [productsRes, settingsRes] = await Promise.all([
       supabase.from('products').select('*').eq('active', true).order('created_at', { ascending: false }),
@@ -1179,8 +1232,12 @@ export async function getServerSideProps() {
     const featuredProducts = featuredIds.length > 0
       ? allProducts.filter(p => featuredIds.includes(p.id))
       : allProducts.filter(p => p.is_new).slice(0, 10)
-    return { props: { initialProducts: allProducts, settings, featuredProducts } }
+    // Товар из ссылки /?product=ID — для корректного OG-превью в мессенджерах
+    const ogProduct = query.product
+      ? allProducts.find(p => p.id?.toString() === query.product.toString()) || null
+      : null
+    return { props: { initialProducts: allProducts, settings, featuredProducts, ogProduct } }
   } catch {
-    return { props: { initialProducts: [], settings: null, featuredProducts: [] } }
+    return { props: { initialProducts: [], settings: null, featuredProducts: [], ogProduct: null } }
   }
 }
